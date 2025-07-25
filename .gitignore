@@ -1,0 +1,35 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+terraform.tfstate.backup
+
+# Terraform providers (large binary files)
+*.tfplan
+.terraform/providers/
+
+# Logs
+*.log
+terraform-apply.log
+terraform-plan.log
+flux-bootstrap-apply.log
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
+*.temp 
