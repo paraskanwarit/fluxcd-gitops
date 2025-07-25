@@ -1,0 +1,77 @@
+
+Terraform used the selected providers to generate the following execution
+plan. Resource actions are indicated with the following symbols:
+  [32m+[0m create[0m
+
+Terraform will perform the following actions:
+
+[1m  # module.gke.google_container_cluster.this[0m will be created
+[0m  [32m+[0m[0m resource "google_container_cluster" "this" {
+      [32m+[0m[0m cluster_ipv4_cidr                        = (known after apply)
+      [32m+[0m[0m datapath_provider                        = (known after apply)
+      [32m+[0m[0m default_max_pods_per_node                = (known after apply)
+      [32m+[0m[0m deletion_protection                      = true
+      [32m+[0m[0m disable_l4_lb_firewall_reconciliation    = false
+      [32m+[0m[0m effective_labels                         = {
+          [32m+[0m[0m "goog-terraform-provisioned" = "true"
+        }
+      [32m+[0m[0m enable_autopilot                         = true
+      [32m+[0m[0m enable_cilium_clusterwide_network_policy = false
+      [32m+[0m[0m enable_fqdn_network_policy               = false
+      [32m+[0m[0m enable_intranode_visibility              = true
+      [32m+[0m[0m enable_kubernetes_alpha                  = false
+      [32m+[0m[0m enable_l4_ilb_subsetting                 = false
+      [32m+[0m[0m enable_legacy_abac                       = false
+      [32m+[0m[0m enable_multi_networking                  = false
+      [32m+[0m[0m enable_shielded_nodes                    = true
+      [32m+[0m[0m endpoint                                 = (known after apply)
+      [32m+[0m[0m id                                       = (known after apply)
+      [32m+[0m[0m label_fingerprint                        = (known after apply)
+      [32m+[0m[0m location                                 = "us-central1"
+      [32m+[0m[0m logging_service                          = "logging.googleapis.com/kubernetes"
+      [32m+[0m[0m master_version                           = (known after apply)
+      [32m+[0m[0m monitoring_service                       = "monitoring.googleapis.com/kubernetes"
+      [32m+[0m[0m name                                     = "dev-gke-autopilot"
+      [32m+[0m[0m network                                  = "default"
+      [32m+[0m[0m networking_mode                          = "VPC_NATIVE"
+      [32m+[0m[0m node_locations                           = (known after apply)
+      [32m+[0m[0m node_version                             = (known after apply)
+      [32m+[0m[0m operation                                = (known after apply)
+      [32m+[0m[0m private_ipv6_google_access               = (known after apply)
+      [32m+[0m[0m project                                  = "extreme-gecko-466211-t1"
+      [32m+[0m[0m self_link                                = (known after apply)
+      [32m+[0m[0m services_ipv4_cidr                       = (known after apply)
+      [32m+[0m[0m subnetwork                               = "default"
+      [32m+[0m[0m terraform_labels                         = {
+          [32m+[0m[0m "goog-terraform-provisioned" = "true"
+        }
+      [32m+[0m[0m tpu_ipv4_cidr_block                      = (known after apply)
+
+      [32m+[0m[0m ip_allocation_policy {
+          [32m+[0m[0m cluster_ipv4_cidr_block       = (known after apply)
+          [32m+[0m[0m cluster_secondary_range_name  = (known after apply)
+          [32m+[0m[0m services_ipv4_cidr_block      = (known after apply)
+          [32m+[0m[0m services_secondary_range_name = (known after apply)
+          [32m+[0m[0m stack_type                    = "IPV4"
+        }
+
+      [32m+[0m[0m release_channel {
+          [32m+[0m[0m channel = "REGULAR"
+        }
+
+      [32m+[0m[0m workload_identity_config {
+          [32m+[0m[0m workload_pool = "extreme-gecko-466211-t1.svc.id.goog"
+        }
+    }
+
+[1mPlan:[0m 1 to add, 0 to change, 0 to destroy.
+[0m
+Changes to Outputs:
+  [32m+[0m[0m cluster_ca_certificate = (known after apply)
+  [32m+[0m[0m cluster_endpoint       = (known after apply)
+  [32m+[0m[0m cluster_name           = "dev-gke-autopilot"
+[90m
+─────────────────────────────────────────────────────────────────────────────[0m
+
+Note: You didn't use the -out option to save this plan, so Terraform can't
+guarantee to take exactly these actions if you run "terraform apply" now.
