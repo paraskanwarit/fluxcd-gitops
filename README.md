@@ -208,5 +208,3 @@ See `DEMO_SCRIPT.md` for a complete demonstration walkthrough.
 - Set up proper CI/CD pipelines for testing
 
 ---
-
-**Note**: This is a demonstration setup. For production use, implement proper security, monitoring, and backup strategies. 

@@ -184,6 +184,4 @@ kubectl get configmap -n sample-app sample-app-html -o yaml
 kubectl patch helmrelease -n sample-app sample-app2 --type='merge' -p='{"spec":{"chart":{"spec":{"version":"0.1.1"}}}}'
 ```
 
----
-
-**Remember**: The key to successful GitOps is always versioning your changes and monitoring the pipeline! 
+--
