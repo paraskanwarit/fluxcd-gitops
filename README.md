@@ -16,7 +16,6 @@ This project demonstrates a production-ready GitOps pipeline with:
 ```
 fluxcd-gitops/
 ├── gke-gitops-infra/           # Infrastructure repository
-│   ├── terraform-modules/gke/  # Reusable GKE module
 │   ├── environment/non-prod/dev/ # Environment-specific config
 │   └── flux-bootstrap/         # FluxCD installation
 ├── sample-app-helm-chart/      # Application Helm chart repository
@@ -24,6 +23,8 @@ fluxcd-gitops/
 └── flux-app-delivery/          # FluxCD delivery repository
     ├── namespaces/             # Kubernetes namespaces
     └── helmrelease/            # FluxCD HelmRelease manifests
+
+Note: GKE module is now in separate repository: https://github.com/paraskanwarit/terraform-modules
 ```
 
 ## Quick Start

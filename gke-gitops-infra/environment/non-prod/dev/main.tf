@@ -14,7 +14,7 @@ provider "google" {
 }
 
 module "gke" {
-  source     = "../../../terraform-modules/gke"
+  source     = "github.com/paraskanwarit/terraform-modules//gke-autopilot"
   name       = var.cluster_name
   location   = var.region
   project    = var.project
