@@ -1,12 +1,12 @@
-# 🎭 GitOps Demo Script - Complete Guide
+#   GitOps Demo Script - Complete Guide
 
-## 📋 Demo Overview
+##   Demo Overview
 
 **Duration**: 15-20 minutes  
 **Audience**: DevOps Engineers, Platform Teams, CTOs  
 **Goal**: Demonstrate a complete, production-ready GitOps pipeline
 
-## 🎪 Demo Flow
+##   Demo Flow
 
 ### 1. Opening (2 minutes)
 
@@ -23,7 +23,7 @@
 **Show the flow diagram**:
 ```bash
 # Display the architecture
-cat README.md | grep -A 20 "## 🏗️ Architecture"
+cat README.md | grep -A 20 "##    Architecture"
 ```
 
 **Explain the 3-repository pattern**:
@@ -286,7 +286,7 @@ kubectl get events -n sample-app --sort-by='.lastTimestamp' | tail -5
 **Show Issues We Faced**:
 ```bash
 # Show the issues documentation
-cat README.md | grep -A 10 "## ⚠️ Issues Faced"
+cat README.md | grep -A 10 "##    Issues Faced"
 ```
 
 **Key Issues Highlighted**:
@@ -310,7 +310,7 @@ spec:
   interval: 5m
   chart:
     spec:
-      chart: charts/sample-app  # ✅ Correct path
+      chart: charts/sample-app  #   Correct path
       version: "0.1.0"
       sourceRef:
         kind: GitRepository
@@ -354,11 +354,11 @@ kubectl get hpa -A
 ### 10. Closing (2 minutes)
 
 **Summary of Benefits**:
-- ✅ **Zero Manual Intervention**: Fully automated deployment
-- ✅ **Git as Source of Truth**: All changes tracked in Git
-- ✅ **Production Ready**: Enterprise-grade security and scalability
-- ✅ **Real Application**: Serving actual traffic
-- ✅ **Audit Trail**: Complete history of all changes
+-   **Zero Manual Intervention**: Fully automated deployment
+-   **Git as Source of Truth**: All changes tracked in Git
+-   **Production Ready**: Enterprise-grade security and scalability
+-   **Real Application**: Serving actual traffic
+-   **Audit Trail**: Complete history of all changes
 
 **Next Steps**:
 - Multi-environment deployment (staging, production)
@@ -371,7 +371,7 @@ kubectl get hpa -A
 - Discussion of production considerations
 - Comparison with other GitOps tools
 
-## 🎯 Demo Tips
+##   Demo Tips
 
 ### Before the Demo
 1. **Test everything** the day before
@@ -391,7 +391,7 @@ kubectl get hpa -A
 3. **Follow up** with additional questions
 4. **Document feedback** for improvements
 
-## 📊 Demo Metrics
+##   Demo Metrics
 
 ### Performance Metrics
 - **Infrastructure Provisioning**: ~5 minutes
@@ -407,14 +407,14 @@ kubectl get hpa -A
 - **Total CPU**: ~2 cores
 
 ### Success Indicators
-- ✅ Application serving traffic
-- ✅ GitOps workflow functional
-- ✅ Zero manual intervention
-- ✅ Production-ready security
-- ✅ Scalable architecture
+-   Application serving traffic
+-   GitOps workflow functional
+-   Zero manual intervention
+-   Production-ready security
+-   Scalable architecture
 
 ---
 
-**🎉 This demo script provides a complete guide for showcasing your GitOps pipeline!**
+**  This demo script provides a complete guide for showcasing your GitOps pipeline!**
 
 The script includes all commands, expected outputs, and explanations to make your demo successful and engaging. 

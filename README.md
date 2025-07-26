@@ -1,6 +1,6 @@
-# 🚀 End-to-End GitOps with FluxCD - Complete Demo Guide
+# End-to-End GitOps with FluxCD - Complete Demo Guide
 
-## 📋 Table of Contents
+## Table of Contents
 1. [Project Overview](#project-overview)
 2. [Architecture & Flow](#architecture--flow)
 3. [Repository Structure](#repository-structure)
@@ -12,7 +12,7 @@
 9. [Troubleshooting](#troubleshooting)
 10. [Production Considerations](#production-considerations)
 
-## 🎯 Project Overview
+## Project Overview
 
 This project demonstrates a complete **production-grade GitOps pipeline** using:
 - **Terraform** for Infrastructure as Code (GKE Autopilot)
@@ -20,13 +20,13 @@ This project demonstrates a complete **production-grade GitOps pipeline** using:
 - **Helm** for application packaging
 - **GitHub** for source control
 
-### 🎪 Demo Highlights
-- ✅ **Zero Manual Intervention**: Fully automated from infrastructure to application deployment
-- ✅ **Production Ready**: Enterprise-grade security and scalability
-- ✅ **GitOps Workflow**: Git as single source of truth
-- ✅ **Real Application**: NGINX serving traffic in production
+### Demo Highlights
+- **Zero Manual Intervention**: Fully automated from infrastructure to application deployment
+- **Production Ready**: Enterprise-grade security and scalability
+- **GitOps Workflow**: Git as single source of truth
+- **Real Application**: NGINX serving traffic in production
 
-## 🏗️ Architecture & Flow
+## Architecture & Flow
 
 ```mermaid
 graph TD
@@ -55,14 +55,14 @@ graph TD
     style I fill:#99ff99
 ```
 
-### 🔄 GitOps Flow
+### GitOps Flow
 1. **Infrastructure**: Terraform creates GKE cluster with FluxCD
 2. **Source Control**: Helm chart stored in dedicated GitHub repository
 3. **GitOps**: FluxCD watches delivery repository for changes
 4. **Deployment**: Application automatically deployed to GKE cluster
 5. **Validation**: Application serving traffic in production
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```
 fluxcd-gitops/
@@ -83,7 +83,7 @@ fluxcd-gitops/
     └── kustomization.yaml
 ```
 
-## 🔧 Prerequisites
+## Prerequisites
 
 ### Required Tools
 - **Terraform** >= 1.0
@@ -104,7 +104,7 @@ gcloud services enable compute.googleapis.com --project=YOUR_PROJECT_ID
 gcloud services enable iam.googleapis.com --project=YOUR_PROJECT_ID
 ```
 
-## 🚀 Complete Setup Guide
+##   Complete Setup Guide
 
 ### Step 1: Clone and Setup Project
 ```bash
@@ -173,7 +173,7 @@ kubectl apply -f helmrelease/sample-app-helmrepository.yaml
 kubectl apply -f helmrelease/sample-app-helmrelease.yaml
 ```
 
-## ⚠️ Issues Faced & Solutions
+##    Issues Faced & Solutions
 
 ### Issue 1: Terraform GKE Module Configuration
 **Problem**: `master_authorized_networks_config` syntax error
@@ -181,7 +181,7 @@ kubectl apply -f helmrelease/sample-app-helmrelease.yaml
 # ❌ Incorrect
 cidr_blocks = var.master_authorized_networks
 
-# ✅ Correct
+#   Correct
 dynamic "cidr_blocks" {
   for_each = var.master_authorized_networks
   content {
@@ -222,7 +222,7 @@ provider "helm" {
   }
 }
 
-# ✅ Correct
+#   Correct
 provider "helm" {
   kubernetes = {
     host = var.cluster_endpoint
@@ -240,7 +240,7 @@ invalid chart reference: stat /tmp/helmchart-.../source/sample-app: no such file
 
 **Solution**: Use correct directory structure and chart path:
 ```yaml
-# ✅ Correct
+#   Correct
 spec:
   chart:
     spec:
@@ -259,7 +259,7 @@ git pull --rebase
 git push --force
 ```
 
-## 🧪 Testing & Validation
+##   Testing & Validation
 
 ### Infrastructure Validation
 ```bash
@@ -295,7 +295,7 @@ kubectl logs -n flux-system deployment/helm-controller --tail=20
 kubectl logs -n flux-system deployment/source-controller --tail=20
 ```
 
-## 🎭 Demo Script
+##   Demo Script
 
 ### Opening (2 minutes)
 "Today I'll demonstrate a complete GitOps pipeline that automatically deploys applications from Git to production. This is a real, working system that showcases modern DevOps practices."
@@ -340,7 +340,7 @@ curl http://localhost:8080
 kubectl get events -n sample-app --sort-by='.lastTimestamp'
 ```
 
-## 🔧 Troubleshooting
+##   Troubleshooting
 
 ### Common Issues
 
@@ -379,7 +379,7 @@ gcloud container clusters get-credentials $CLUSTER_NAME --region=$REGION
 kubectl get nodes
 ```
 
-## 🏭 Production Considerations
+##   Production Considerations
 
 ### Security Enhancements
 - [ ] Enable Workload Identity
@@ -406,7 +406,7 @@ kubectl get nodes
 - [ ] Application data backups
 - [ ] Disaster recovery procedures
 
-## 📊 Performance Metrics
+##   Performance Metrics
 
 ### Current Setup Performance
 - **Infrastructure Provisioning**: ~5 minutes
@@ -421,7 +421,7 @@ kubectl get nodes
 - **Total Memory**: ~4GB
 - **Total CPU**: ~2 cores
 
-## 🎯 Next Steps
+##   Next Steps
 
 ### Immediate Improvements
 1. **Automate GitHub Repository Creation**: Use GitHub API or Terraform GitHub provider
@@ -435,7 +435,7 @@ kubectl get nodes
 3. **Multi-Cluster**: Deploy to multiple clusters
 4. **GitOps Notifications**: Slack/Teams notifications
 
-## 📞 Support
+##   Support
 
 For issues or questions:
 - **GitHub Issues**: Create an issue in the repository
@@ -444,6 +444,6 @@ For issues or questions:
 
 ---
 
-**🎉 Congratulations! You now have a complete, production-ready GitOps pipeline!**
+**  Congratulations! You now have a complete, production-ready GitOps pipeline!**
 
 This setup demonstrates modern DevOps practices and can be used as a foundation for enterprise GitOps implementations. 

@@ -1,11 +1,11 @@
 # ⚡ GitOps Demo Quick Reference
 
-## 🚀 One-Command Setup
+##   One-Command Setup
 ```bash
 ./scripts/complete-setup.sh
 ```
 
-## 📊 Current Status Commands
+##   Current Status Commands
 
 ### Infrastructure
 ```bash
@@ -40,7 +40,7 @@ kubectl logs -n flux-system deployment/helm-controller --tail=20
 kubectl logs -n flux-system deployment/source-controller --tail=20
 ```
 
-## 🧪 Testing Commands
+##   Testing Commands
 
 ### Application Connectivity
 ```bash
@@ -56,12 +56,12 @@ kubectl get all -n sample-app
 kubectl get all -n flux-system
 ```
 
-## 🎭 Demo Commands
+##   Demo Commands
 
 ### Show Architecture
 ```bash
 # Display flow diagram
-cat README.md | grep -A 20 "## 🏗️ Architecture"
+cat README.md | grep -A 20 "##    Architecture"
 ```
 
 ### Show GitOps Flow
@@ -89,7 +89,7 @@ kubectl get pods -n sample-app -w
 kubectl get events -n sample-app --sort-by='.lastTimestamp' | tail -10
 ```
 
-## 🔧 Troubleshooting Commands
+##   Troubleshooting Commands
 
 ### FluxCD Issues
 ```bash
@@ -119,7 +119,7 @@ gcloud auth print-access-token
 gcloud container clusters get-credentials gk3-dev-gke-autopilot --region=us-central1
 ```
 
-## 📋 Key Information
+##   Key Information
 
 ### Current Configuration
 - **GKE Cluster**: `gk3-dev-gke-autopilot`
@@ -136,7 +136,7 @@ gcloud container clusters get-credentials gk3-dev-gke-autopilot --region=us-cent
 - **GKE Console**: `https://console.cloud.google.com/kubernetes/clusters/details/us-central1/gk3-dev-gke-autopilot?project=extreme-gecko-466211-t1`
 - **Application**: `http://localhost:8080` (via port-forward)
 
-## 🎯 Demo Highlights
+##   Demo Highlights
 
 ### What to Show
 1. **Infrastructure**: GKE cluster with FluxCD
@@ -146,11 +146,11 @@ gcloud container clusters get-credentials gk3-dev-gke-autopilot --region=us-cent
 5. **Production Ready**: Enterprise-grade setup
 
 ### Key Benefits
-- ✅ **Zero Manual Intervention**: Fully automated
-- ✅ **Git as Source of Truth**: All changes tracked
-- ✅ **Production Ready**: Enterprise security
-- ✅ **Real Application**: Serving actual traffic
-- ✅ **Scalable**: Easy to replicate
+-   **Zero Manual Intervention**: Fully automated
+-   **Git as Source of Truth**: All changes tracked
+-   **Production Ready**: Enterprise security
+-   **Real Application**: Serving actual traffic
+-   **Scalable**: Easy to replicate
 
 ## 🚨 Emergency Commands
 
@@ -172,11 +172,11 @@ kubectl get nodes && \
 kubectl get deployment -n flux-system && \
 kubectl get pods -n sample-app && \
 kubectl get helmrelease -A && \
-echo "✅ All systems operational"
+echo "  All systems operational"
 ```
 
 ---
 
-**🎉 Your GitOps demo is ready to impress!**
+**  Your GitOps demo is ready to impress!**
 
 This quick reference contains all the essential commands and information you need for a successful GitOps demonstration. 
