@@ -1,4 +1,4 @@
-# Variables for GKE and FluxCD Configuration
+# Variables for existing GKE cluster and FluxCD configuration
 
 variable "project_id" {
   description = "The GCP project ID"
@@ -17,40 +17,15 @@ variable "cluster_name" {
   default     = "dev-gke-autopilot"
 }
 
-variable "network" {
-  description = "The VPC network to host the cluster"
-  type        = string
-  default     = "default"
-}
-
-variable "subnetwork" {
-  description = "The subnetwork to host the cluster"
-  type        = string
-  default     = "default"
-}
-
-variable "release_channel" {
-  description = "The release channel of the cluster"
-  type        = string
-  default     = "regular"
-}
-
-variable "master_authorized_networks" {
-  description = "List of master authorized networks"
-  type = list(object({
-    cidr_block   = string
-    display_name = string
-  }))
-  default = [
-    {
-      cidr_block   = "0.0.0.0/0"
-      display_name = "All Networks (Dev Environment)"
-    }
-  ]
-}
-
 variable "flux_version" {
   description = "The version of FluxCD to install"
   type        = string
   default     = "2.12.2"
-} 
+}
+
+# Note: The following variables are not used when working with existing clusters
+# They are kept for reference but have no effect on data source operations
+# variable "network" { ... }
+# variable "subnetwork" { ... }
+# variable "release_channel" { ... }
+# variable "master_authorized_networks" { ... } 
