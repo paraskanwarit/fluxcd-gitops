@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Complete GitOps Setup Script
 # This script automates the entire GitOps demo setup from infrastructure to application deployment
@@ -13,12 +13,24 @@ BLUE='\033[0;34m'
 PURPLE='\033[0;35m'
 NC='\033[0m' # No Color
 
-# Configuration
-PROJECT_ID="extreme-gecko-466211-t1"
-REGION="us-central1"
-CLUSTER_NAME="gk3-dev-gke-autopilot"
-GITHUB_USERNAME="paraskanwarit"
-GITHUB_TOKEN=""
+# Configuration - Auto-detect from current context if possible
+PROJECT_ID="${PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || echo 'extreme-gecko-466211-t1')}"
+REGION="${REGION:-us-central1}"
+CLUSTER_NAME="${CLUSTER_NAME:-dev-gke-autopilot}"
+GITHUB_USERNAME="${GITHUB_USERNAME:-paraskanwarit}"
+GITHUB_TOKEN="${GITHUB_TOKEN:-}"
+
+# Try to detect cluster name from current kubectl context
+if kubectl config current-context &> /dev/null; then
+    CURRENT_CONTEXT=$(kubectl config current-context)
+    if [[ $CURRENT_CONTEXT == gke_* ]]; then
+        # Extract cluster name from GKE context format: gke_PROJECT_REGION_CLUSTER
+        DETECTED_CLUSTER=$(echo $CURRENT_CONTEXT | cut -d'_' -f4)
+        if [ ! -z "$DETECTED_CLUSTER" ]; then
+            CLUSTER_NAME="$DETECTED_CLUSTER"
+        fi
+    fi
+fi
 
 # Function to print colored output
 print_status() {
@@ -93,11 +105,50 @@ enable_gcp_apis() {
     print_success "GCP APIs enabled"
 }
 
-# Function to deploy GKE infrastructure
-deploy_infrastructure() {
-    print_step "Deploying GKE infrastructure..."
+# Function to validate existing GKE cluster
+validate_existing_cluster() {
+    print_step "Validating existing GKE cluster..."
+    
+    # Check if cluster exists
+    if gcloud container clusters describe $CLUSTER_NAME --region=$REGION --project=$PROJECT_ID &> /dev/null; then
+        print_status "Cluster $CLUSTER_NAME found in project $PROJECT_ID"
+        
+        # Get cluster credentials
+        print_status "Getting cluster credentials..."
+        gcloud container clusters get-credentials $CLUSTER_NAME \
+            --region=$REGION --project=$PROJECT_ID
+        
+        print_success "Successfully connected to existing GKE cluster"
+        
+        # Display cluster info
+        print_status "Cluster Information:"
+        kubectl cluster-info
+        kubectl get nodes
+        
+        return 0
+    else
+        print_warning "Cluster $CLUSTER_NAME not found in region $REGION"
+        return 1
+    fi
+}
+
+# Function to deploy infrastructure using existing Terraform code
+deploy_infrastructure_terraform() {
+    print_status "Deploying GKE infrastructure using existing Terraform code..."
+    
+    # Check if terraform is available
+    if ! command -v terraform &> /dev/null; then
+        print_error "terraform not found. Please install it first."
+        return 1
+    fi
     
     cd gke-gitops-infra/environment/non-prod/dev
+    
+    # Clean up any existing Terraform state that might be using old module source
+    if [ -d ".terraform" ]; then
+        print_status "Cleaning up existing Terraform state..."
+        rm -rf .terraform .terraform.lock.hcl
+    fi
     
     # Initialize Terraform
     print_status "Initializing Terraform..."
@@ -105,14 +156,18 @@ deploy_infrastructure() {
     
     # Plan deployment
     print_status "Planning Terraform deployment..."
-    terraform plan -var="project=$PROJECT_ID" \
-                   -var="region=$REGION" \
-                   -var="cluster_name=$CLUSTER_NAME" \
-                   -out=tfplan
-    
-    # Deploy infrastructure
-    print_status "Deploying infrastructure..."
-    terraform apply tfplan
+    if terraform plan -var="project=$PROJECT_ID" \
+                      -var="region=$REGION" \
+                      -var="cluster_name=$CLUSTER_NAME" \
+                      -out=tfplan; then
+        # Deploy infrastructure
+        print_status "Deploying infrastructure..."
+        terraform apply tfplan
+    else
+        print_error "Terraform plan failed"
+        cd ../../../..
+        return 1
+    fi
     
     # Get cluster credentials
     print_status "Getting cluster credentials..."
@@ -121,18 +176,94 @@ deploy_infrastructure() {
     
     cd ../../../..
     
-    print_success "GKE infrastructure deployed"
+    return 0
 }
 
-# Function to bootstrap FluxCD
+# Function to deploy GKE infrastructure
+deploy_infrastructure() {
+    print_step "Deploying GKE infrastructure..."
+    
+    if deploy_infrastructure_terraform; then
+        print_success "GKE infrastructure deployed successfully"
+    else
+        print_error "Failed to deploy GKE infrastructure"
+        exit 1
+    fi
+}
+
+# Function to check if FluxCD is properly installed
+check_fluxcd_installation() {
+    print_status "Checking FluxCD installation..."
+    
+    # Check if flux-system namespace exists
+    if ! kubectl get namespace flux-system &> /dev/null; then
+        return 1
+    fi
+    
+    # Check if CRDs are properly installed
+    if ! kubectl get crd gitrepositories.source.toolkit.fluxcd.io &> /dev/null || \
+       ! kubectl get crd helmreleases.helm.toolkit.fluxcd.io &> /dev/null; then
+        return 1
+    fi
+    
+    # Check if controllers are running
+    if ! kubectl get deployment -n flux-system source-controller &> /dev/null || \
+       ! kubectl get deployment -n flux-system helm-controller &> /dev/null || \
+       ! kubectl get deployment -n flux-system kustomize-controller &> /dev/null; then
+        return 1
+    fi
+    
+    # Check if deployments are ready
+    if ! kubectl wait --for=condition=available deployment/source-controller -n flux-system --timeout=30s &> /dev/null || \
+       ! kubectl wait --for=condition=available deployment/helm-controller -n flux-system --timeout=30s &> /dev/null || \
+       ! kubectl wait --for=condition=available deployment/kustomize-controller -n flux-system --timeout=30s &> /dev/null; then
+        return 1
+    fi
+    
+    return 0
+}
+
+# Function to bootstrap FluxCD using existing Terraform code
 bootstrap_fluxcd() {
     print_step "Bootstrapping FluxCD..."
     
-    # Get cluster details for FluxCD
+    # Check if FluxCD is already properly installed
+    if check_fluxcd_installation; then
+        print_success "FluxCD is already properly installed and running"
+        return 0
+    fi
+    
+    # If FluxCD namespace exists but installation is incomplete, clean it up
+    if kubectl get namespace flux-system &> /dev/null; then
+        print_warning "FluxCD namespace exists but installation is incomplete. Cleaning up..."
+        kubectl delete namespace flux-system --ignore-not-found=true
+        # Wait for namespace to be fully deleted
+        while kubectl get namespace flux-system &> /dev/null; do
+            print_status "Waiting for flux-system namespace to be deleted..."
+            sleep 5
+        done
+    fi
+    
+    # Use existing Terraform code to install FluxCD
+    print_status "Using existing Terraform code to install FluxCD..."
+    
+    # Check if terraform is available
+    if ! command -v terraform &> /dev/null; then
+        print_error "terraform not found. Please install it first."
+        exit 1
+    fi
+    
+    # Get cluster details
     print_status "Getting cluster details..."
     export CLUSTER_ENDPOINT=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
-    export CLUSTER_CA_CERT=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.certificate-authority-data}')
+    export CLUSTER_CA_CERT=$(kubectl config view --minify --raw -o jsonpath='{.clusters[0].cluster.certificate-authority-data}')
     export GKE_TOKEN=$(gcloud auth print-access-token)
+    
+    # Validate cluster details
+    if [ -z "$CLUSTER_ENDPOINT" ] || [ -z "$CLUSTER_CA_CERT" ] || [ -z "$GKE_TOKEN" ]; then
+        print_error "Failed to get cluster details. Make sure you're connected to the cluster."
+        exit 1
+    fi
     
     cd gke-gitops-infra/flux-bootstrap
     
@@ -150,15 +281,22 @@ bootstrap_fluxcd() {
     cd ../../..
     
     # Wait for FluxCD to be ready
-    print_status "Waiting for FluxCD to be ready..."
-    kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=flux -n flux-system --timeout=300s
+    print_status "Waiting for FluxCD controllers to be ready..."
+    kubectl wait --for=condition=available deployment/source-controller -n flux-system --timeout=300s
+    kubectl wait --for=condition=available deployment/helm-controller -n flux-system --timeout=300s
+    kubectl wait --for=condition=available deployment/kustomize-controller -n flux-system --timeout=300s
     
-    print_success "FluxCD bootstrapped successfully"
+    # Verify CRDs are installed
+    print_status "Verifying FluxCD CRDs..."
+    kubectl get crd gitrepositories.source.toolkit.fluxcd.io
+    kubectl get crd helmreleases.helm.toolkit.fluxcd.io
+    
+    print_success "FluxCD bootstrapped successfully using existing Terraform code"
 }
 
-# Function to setup GitHub repositories
-setup_github_repos() {
-    print_step "Setting up GitHub repositories..."
+# Function to check if GitHub repositories exist
+check_github_repos() {
+    print_status "Checking GitHub repositories..."
     
     # Get GitHub token if not provided
     if [ -z "$GITHUB_TOKEN" ]; then
@@ -171,36 +309,116 @@ setup_github_repos() {
     # Validate token
     if ! curl -s -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/user | jq -e '.login' > /dev/null; then
         print_error "Invalid GitHub token"
-        exit 1
+        return 1
     fi
     
-    # Create repositories using the setup script
+    # Check if both repositories exist
+    if curl -s -H "Authorization: token $GITHUB_TOKEN" \
+        "https://api.github.com/repos/$GITHUB_USERNAME/sample-app-helm-chart" | jq -e '.name' > /dev/null 2>&1 && \
+       curl -s -H "Authorization: token $GITHUB_TOKEN" \
+        "https://api.github.com/repos/$GITHUB_USERNAME/flux-app-delivery" | jq -e '.name' > /dev/null 2>&1; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Function to setup GitHub repositories
+setup_github_repos() {
+    print_step "Setting up GitHub repositories..."
+    
+    # Check if repositories already exist
+    if check_github_repos; then
+        print_success "GitHub repositories already exist and are accessible"
+        return 0
+    fi
+    
+    print_status "GitHub repositories not found or not accessible. Creating them..."
+    
+    # Use existing setup script
     cd scripts
     GITHUB_TOKEN=$GITHUB_TOKEN ./setup-github-repos.sh
     cd ..
     
-    print_success "GitHub repositories setup completed"
+    # Verify repositories were created successfully
+    if check_github_repos; then
+        print_success "GitHub repositories setup completed successfully"
+    else
+        print_error "Failed to setup GitHub repositories"
+        exit 1
+    fi
 }
 
-# Function to deploy application via GitOps
+# Function to configure FluxCD to watch and deploy from Git repositories
 deploy_application() {
-    print_step "Deploying application via GitOps..."
+    print_step "Configuring GitOps deployment..."
     
-    cd flux-app-delivery
+    # Configure FluxCD to watch the flux-app-delivery repository
+    print_status "Creating GitRepository for flux-app-delivery..."
+    kubectl apply -f - <<EOF
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: flux-app-delivery
+  namespace: flux-system
+spec:
+  interval: 1m0s
+  url: https://github.com/$GITHUB_USERNAME/flux-app-delivery.git
+  ref:
+    branch: main
+EOF
+
+    # Configure FluxCD to deploy everything from the repository
+    print_status "Creating Kustomization for automatic deployment..."
+    kubectl apply -f - <<EOF
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: flux-app-delivery
+  namespace: flux-system
+spec:
+  interval: 5m0s
+  path: "./"
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-app-delivery
+  postBuild:
+    substitute:
+      GITHUB_USERNAME: "$GITHUB_USERNAME"
+EOF
+
+    # Wait for GitRepository to be ready
+    print_status "Waiting for GitRepository to sync..."
+    kubectl wait --for=condition=ready gitrepository/flux-app-delivery -n flux-system --timeout=300s
     
-    # Apply FluxCD manifests
-    print_status "Applying FluxCD manifests..."
-    kubectl apply -f namespaces/sample-app-namespace.yaml
-    kubectl apply -f helmrelease/sample-app-helmrepository.yaml
-    kubectl apply -f helmrelease/sample-app-helmrelease.yaml
+    # Wait for Kustomization to be ready
+    print_status "Waiting for Kustomization to deploy resources..."
+    kubectl wait --for=condition=ready kustomization/flux-app-delivery -n flux-system --timeout=300s
     
-    cd ..
+    # Wait for the sample-app namespace to be created by FluxCD
+    print_status "Waiting for sample-app namespace to be created..."
+    timeout=120
+    while [ $timeout -gt 0 ]; do
+        if kubectl get namespace sample-app &> /dev/null; then
+            break
+        fi
+        sleep 5
+        timeout=$((timeout - 5))
+    done
     
-    # Wait for application to be deployed
-    print_status "Waiting for application deployment..."
+    if [ $timeout -le 0 ]; then
+        print_warning "sample-app namespace not created yet. Checking FluxCD status..."
+        kubectl get kustomization -n flux-system
+        kubectl describe kustomization flux-app-delivery -n flux-system
+        return 1
+    fi
+    
+    # Wait for application to be deployed by FluxCD
+    print_status "Waiting for application to be deployed by FluxCD..."
     kubectl wait --for=condition=ready pod -l app=sample-app -n sample-app --timeout=300s
     
-    print_success "Application deployed via GitOps"
+    print_success "Application deployed automatically via GitOps!"
 }
 
 # Function to validate deployment
@@ -294,8 +512,8 @@ trap cleanup EXIT
 
 # Main execution
 main() {
-    echo "🚀 Complete GitOps Demo Setup"
-    echo "============================"
+    echo "🚀 Complete GitOps Demo Setup (Using Existing Infrastructure)"
+    echo "========================================================"
     echo
     
     # Check prerequisites
@@ -304,8 +522,10 @@ main() {
     # Enable GCP APIs
     enable_gcp_apis
     
-    # Deploy infrastructure
-    deploy_infrastructure
+    # Validate existing infrastructure or deploy new
+    if ! validate_existing_cluster; then
+        deploy_infrastructure
+    fi
     
     # Bootstrap FluxCD
     bootstrap_fluxcd

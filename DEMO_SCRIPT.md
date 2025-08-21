@@ -2,21 +2,16 @@
 
 ##   Demo Overview
 
-**Duration**: 15-20 minutes  
-**Audience**: DevOps Engineers, Platform Teams, CTOs  
-**Goal**: Demonstrate a complete, production-ready GitOps pipeline
 
 ##   Demo Flow
 
-### 1. Opening (2 minutes)
 
 **Script**: "Today I'll demonstrate a complete GitOps pipeline that automatically deploys applications from Git to production. This is a real, working system that showcases modern DevOps practices."
 
 **Key Points**:
 - Zero manual intervention
 - Production-ready setup
-- Real application serving traffic
-- Enterprise-grade security
+
 
 ### 2. Architecture Overview (2 minutes)
 
