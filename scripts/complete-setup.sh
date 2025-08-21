@@ -263,65 +263,76 @@ validate_deployment() {
     
     # Test application connectivity
     print_status "Testing application connectivity..."
-    kubectl port-forward -n sample-app svc/sample-app2-sample-app 8080:80 &
+    
+    # Start port-forward in background and capture PID
+    kubectl port-forward -n sample-app svc/sample-app2-sample-app 8080:80 > /dev/null 2>&1 &
     local port_forward_pid=$!
     
     # Wait for port forward to be ready
-    sleep 5
+    print_status "Waiting for port-forward to establish..."
+    sleep 10
     
     # Test application
-    if curl -s http://localhost:8080 | grep -q "Welcome to nginx"; then
+    if curl -s --max-time 10 http://localhost:8080 | grep -q "Welcome to nginx"; then
         print_success "Application is serving traffic correctly"
     else
-        print_warning "Application connectivity test failed"
+        print_warning "Application connectivity test failed - checking if port-forward is working"
+        if netstat -an | grep -q ":8080.*LISTEN"; then
+            print_status "Port 8080 is listening, but application test failed"
+        else
+            print_warning "Port-forward may not be working correctly"
+        fi
     fi
     
     # Clean up port forward
-    kill $port_forward_pid 2>/dev/null || true
+    if [ -n "$port_forward_pid" ]; then
+        kill $port_forward_pid 2>/dev/null || true
+        wait $port_forward_pid 2>/dev/null || true
+    fi
     
     print_success "Deployment validation completed"
 }
 
 # Function to display final summary
 display_summary() {
-    print_success "🎉 GitOps Demo Setup Completed Successfully!"
+    print_success "GitOps Demo Setup Completed Successfully!"
     echo
-    echo "📊 Deployment Summary:"
-    echo "====================="
-    echo "  • GKE Cluster: $CLUSTER_NAME (existing)"
-    echo "  • Region: $REGION"
-    echo "  • Project: $PROJECT_ID"
-    echo "  • FluxCD Version: v2.12.2"
-    echo "  • Application: NGINX sample app"
+    echo "Deployment Summary:"
+    echo "=================="
+    echo "  GKE Cluster: $CLUSTER_NAME (existing)"
+    echo "  Region: $REGION"
+    echo "  Project: $PROJECT_ID"
+    echo "  FluxCD Version: v2.12.2"
+    echo "  Application: NGINX sample app"
     echo
-    echo "🔗 Access Information:"
-    echo "====================="
-    echo "  • GKE Cluster: https://console.cloud.google.com/kubernetes/clusters/details/$REGION/$CLUSTER_NAME?project=$PROJECT_ID"
-    echo "  • GitHub Repositories:"
+    echo "Access Information:"
+    echo "=================="
+    echo "  GKE Cluster: https://console.cloud.google.com/kubernetes/clusters/details/$REGION/$CLUSTER_NAME?project=$PROJECT_ID"
+    echo "  GitHub Repositories:"
     echo "    - https://github.com/$GITHUB_USERNAME/sample-app-helm-chart"
     echo "    - https://github.com/$GITHUB_USERNAME/flux-app-delivery"
     echo
-    echo "🧪 Testing Commands:"
-    echo "==================="
-    echo "  • Check cluster: kubectl get nodes"
-    echo "  • Check FluxCD: kubectl get deployment -n flux-system"
-    echo "  • Check app: kubectl get pods -n sample-app"
-    echo "  • Test app: kubectl port-forward -n sample-app svc/sample-app2-sample-app 8080:80"
+    echo "Testing Commands:"
+    echo "================="
+    echo "  Check cluster: kubectl get nodes"
+    echo "  Check FluxCD: kubectl get deployment -n flux-system"
+    echo "  Check app: kubectl get pods -n sample-app"
+    echo "  Test app: kubectl port-forward -n sample-app svc/sample-app2-sample-app 8080:80"
     echo
-    echo "🎭 Demo Commands:"
-    echo "================"
-    echo "  • Show GitOps flow: kubectl get helmrelease -A"
-    echo "  • Show app logs: kubectl logs -n sample-app -l app=sample-app"
-    echo "  • Show FluxCD logs: kubectl logs -n flux-system deployment/helm-controller"
+    echo "Demo Commands:"
+    echo "=============="
+    echo "  Show GitOps flow: kubectl get helmrelease -A"
+    echo "  Show app logs: kubectl logs -n sample-app -l app=sample-app"
+    echo "  Show FluxCD logs: kubectl logs -n flux-system deployment/helm-controller"
     echo
-    echo "🚀 Your GitOps pipeline is ready for demos!"
+    echo "Your GitOps pipeline is ready for demos!"
 }
 
 # Function to handle cleanup on script exit
 cleanup() {
     print_warning "Cleaning up..."
     # Kill any background processes
-    jobs -p | xargs -r kill
+    jobs -p | xargs -r kill 2>/dev/null || true
 }
 
 # Set trap for cleanup
@@ -329,8 +340,8 @@ trap cleanup EXIT
 
 # Main execution
 main() {
-    echo "🚀 Complete GitOps Demo Setup (Using Existing Infrastructure)"
-    echo "============================================================"
+    echo "Complete GitOps Demo Setup (Using Existing Infrastructure)"
+    echo "========================================================"
     echo
     
     # Check prerequisites
