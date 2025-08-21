@@ -9,8 +9,8 @@ cluster_name = "dev-gke-autopilot"
 network      = "default"
 subnetwork   = "default"
 
-# Release channel for GKE
-release_channel = "regular"
+# Release channel for GKE (must be uppercase)
+release_channel = "REGULAR"
 
 # FluxCD Configuration
 flux_version = "2.12.2"
