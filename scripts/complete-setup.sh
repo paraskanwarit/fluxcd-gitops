@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Complete GitOps Setup Script
-# This script automates the entire GitOps demo setup from infrastructure to application deployment
+# This script automates the GitOps demo setup using existing GKE infrastructure
 
 set -e
 
@@ -16,7 +16,7 @@ NC='\033[0m' # No Color
 # Configuration
 PROJECT_ID="extreme-gecko-466211-t1"
 REGION="us-central1"
-CLUSTER_NAME="gk3-dev-gke-autopilot"
+CLUSTER_NAME="dev-gke-autopilot"
 GITHUB_USERNAME="paraskanwarit"
 GITHUB_TOKEN=""
 
@@ -93,48 +93,64 @@ enable_gcp_apis() {
     print_success "GCP APIs enabled"
 }
 
-# Function to deploy GKE infrastructure
-deploy_infrastructure() {
-    print_step "Deploying GKE infrastructure..."
+# Function to validate existing GKE cluster
+validate_existing_cluster() {
+    print_step "Validating existing GKE cluster..."
     
-    cd gke-gitops-infra/environment/non-prod/dev
+    # Check if cluster exists
+    if ! gcloud container clusters describe $CLUSTER_NAME --region=$REGION --project=$PROJECT_ID &> /dev/null; then
+        print_error "GKE cluster $CLUSTER_NAME not found in region $REGION"
+        exit 1
+    fi
     
-    # Initialize Terraform
-    print_status "Initializing Terraform..."
-    terraform init
-    
-    # Plan deployment
-    print_status "Planning Terraform deployment..."
-    terraform plan -var="project=$PROJECT_ID" \
-                   -var="region=$REGION" \
-                   -var="cluster_name=$CLUSTER_NAME" \
-                   -out=tfplan
-    
-    # Deploy infrastructure
-    print_status "Deploying infrastructure..."
-    terraform apply tfplan
+    print_status "Cluster $CLUSTER_NAME found in project $PROJECT_ID"
     
     # Get cluster credentials
     print_status "Getting cluster credentials..."
     gcloud container clusters get-credentials $CLUSTER_NAME \
         --region=$REGION --project=$PROJECT_ID
     
-    cd ../../../..
+    # Verify cluster connectivity
+    if ! kubectl get nodes &> /dev/null; then
+        print_error "Cannot connect to cluster. Please check your authentication."
+        exit 1
+    fi
     
-    print_success "GKE infrastructure deployed"
+    print_success "Successfully connected to existing GKE cluster"
+    
+    # Display cluster info
+    print_status "Cluster Information:"
+    kubectl cluster-info
+    kubectl get nodes
 }
 
 # Function to bootstrap FluxCD
 bootstrap_fluxcd() {
     print_step "Bootstrapping FluxCD..."
     
-    # Get cluster details for FluxCD
-    print_status "Getting cluster details..."
-    export CLUSTER_ENDPOINT=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
-    export CLUSTER_CA_CERT=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.certificate-authority-data}')
-    export GKE_TOKEN=$(gcloud auth print-access-token)
+    # Check if FluxCD is already installed
+    if kubectl get deployment -n flux-system &> /dev/null; then
+        print_warning "FluxCD appears to be already installed. Skipping bootstrap."
+        return 0
+    fi
     
-    cd gke-gitops-infra/flux-bootstrap
+    # Check if we're in the right directory
+    if [ ! -d "environments/non-prod/dev" ]; then
+        print_error "Please run this script from the das-l4-infra-np repository root"
+        exit 1
+    fi
+    
+    cd environments/non-prod/dev
+    
+    # Check if flux-bootstrap.tf exists, if not, copy from example
+    if [ ! -f "flux-bootstrap.tf" ]; then
+        print_status "Setting up FluxCD bootstrap..."
+        cp flux-bootstrap.tf.example flux-bootstrap.tf
+        print_warning "FluxCD bootstrap enabled. Run 'terraform apply' to install FluxCD."
+        print_warning "Or run this script again after FluxCD is installed to continue with app deployment."
+        cd ../../..
+        return 0
+    fi
     
     # Initialize Terraform
     print_status "Initializing FluxCD Terraform..."
@@ -142,10 +158,7 @@ bootstrap_fluxcd() {
     
     # Deploy FluxCD
     print_status "Deploying FluxCD..."
-    terraform apply -auto-approve \
-        -var="cluster_endpoint=$CLUSTER_ENDPOINT" \
-        -var="cluster_ca_certificate=$CLUSTER_CA_CERT" \
-        -var="gke_token=$GKE_TOKEN"
+    terraform apply -auto-approve
     
     cd ../../..
     
@@ -159,6 +172,12 @@ bootstrap_fluxcd() {
 # Function to setup GitHub repositories
 setup_github_repos() {
     print_step "Setting up GitHub repositories..."
+    
+    # Check if repositories already exist
+    if curl -s "https://api.github.com/repos/$GITHUB_USERNAME/sample-app-helm-chart" | jq -e '.id' > /dev/null 2>&1; then
+        print_warning "GitHub repositories already exist. Skipping creation."
+        return 0
+    fi
     
     # Get GitHub token if not provided
     if [ -z "$GITHUB_TOKEN" ]; then
@@ -175,9 +194,13 @@ setup_github_repos() {
     fi
     
     # Create repositories using the setup script
-    cd scripts
-    GITHUB_TOKEN=$GITHUB_TOKEN ./setup-github-repos.sh
-    cd ..
+    if [ -f "scripts/setup-github-repos.sh" ]; then
+        cd scripts
+        GITHUB_TOKEN=$GITHUB_TOKEN ./setup-github-repos.sh
+        cd ..
+    else
+        print_warning "GitHub setup script not found. Please create repositories manually."
+    fi
     
     print_success "GitHub repositories setup completed"
 }
@@ -185,6 +208,18 @@ setup_github_repos() {
 # Function to deploy application via GitOps
 deploy_application() {
     print_step "Deploying application via GitOps..."
+    
+    # Check if FluxCD is running
+    if ! kubectl get deployment -n flux-system &> /dev/null; then
+        print_error "FluxCD is not running. Please bootstrap FluxCD first."
+        exit 1
+    fi
+    
+    # Check if we have the flux-app-delivery directory
+    if [ ! -d "flux-app-delivery" ]; then
+        print_warning "flux-app-delivery directory not found. Please clone or create it first."
+        return 0
+    fi
     
     cd flux-app-delivery
     
@@ -253,7 +288,7 @@ display_summary() {
     echo
     echo "📊 Deployment Summary:"
     echo "====================="
-    echo "  • GKE Cluster: $CLUSTER_NAME"
+    echo "  • GKE Cluster: $CLUSTER_NAME (existing)"
     echo "  • Region: $REGION"
     echo "  • Project: $PROJECT_ID"
     echo "  • FluxCD Version: v2.12.2"
@@ -294,8 +329,8 @@ trap cleanup EXIT
 
 # Main execution
 main() {
-    echo "🚀 Complete GitOps Demo Setup"
-    echo "============================"
+    echo "🚀 Complete GitOps Demo Setup (Using Existing Infrastructure)"
+    echo "============================================================"
     echo
     
     # Check prerequisites
@@ -304,8 +339,8 @@ main() {
     # Enable GCP APIs
     enable_gcp_apis
     
-    # Deploy infrastructure
-    deploy_infrastructure
+    # Validate existing cluster
+    validate_existing_cluster
     
     # Bootstrap FluxCD
     bootstrap_fluxcd
