@@ -416,6 +416,11 @@ EOF
     
     # Wait for application to be deployed by FluxCD
     print_status "Waiting for application to be deployed by FluxCD..."
+    
+    # Wait for HelmRelease to be ready first
+    kubectl wait --for=condition=ready helmrelease/sample-app2 -n sample-app --timeout=300s
+    
+    # Then wait for pods to be ready
     kubectl wait --for=condition=ready pod -l app=sample-app -n sample-app --timeout=300s
     
     print_success "Application deployed automatically via GitOps!"
