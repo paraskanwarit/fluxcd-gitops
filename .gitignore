@@ -34,3 +34,4 @@ Thumbs.db
 *.tmp
 *.temp # Prevent duplicate flux-app-delivery folder (use separate repo)
 flux-app-delivery/
+showcase.md
