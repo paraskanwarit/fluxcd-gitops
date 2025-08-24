@@ -5,23 +5,23 @@
 ```mermaid
 graph TB
     subgraph "Developer Workflow"
-        DEV[👨‍💻 Developer] --> |1. Push code changes| HELM_REPO[📦 sample-app-helm-chart]
-        DEV --> |2. Update deployment config| FLUX_REPO[⚙️ flux-app-delivery]
+        DEV[Developer] --> |1. Push code changes| HELM_REPO[sample-app-helm-chart]
+        DEV --> |2. Update deployment config| FLUX_REPO[flux-app-delivery]
     end
     
     subgraph "GitHub Repositories"
-        HELM_REPO --> |Contains| HELM_CHART[📋 Helm Chart<br/>charts/sample-app/]
-        FLUX_REPO --> |Contains| FLUX_CONFIG[🔧 FluxCD Configs<br/>sample-app-namespace.yaml<br/>sample-app-helmrelease.yaml<br/>sample-app-source.yaml]
+        HELM_REPO --> |Contains| HELM_CHART[Helm Chart<br/>charts/sample-app/]
+        FLUX_REPO --> |Contains| FLUX_CONFIG[FluxCD Configs<br/>sample-app-namespace.yaml<br/>sample-app-helmrelease.yaml<br/>sample-app-source.yaml]
     end
     
     subgraph "GKE Cluster (dev-gke-autopilot)"
         subgraph "flux-system namespace"
-            FLUX_CONTROLLERS[🤖 FluxCD Controllers<br/>- source-controller<br/>- helm-controller<br/>- kustomize-controller]
+            FLUX_CONTROLLERS[FluxCD Controllers<br/>- source-controller<br/>- helm-controller<br/>- kustomize-controller]
         end
         
         subgraph "sample-app namespace"
-            NGINX_PODS[🌐 NGINX Pods<br/>sample-app2-sample-app-xxx]
-            SVC[🔗 Service<br/>sample-app2-sample-app]
+            NGINX_PODS[NGINX Pods<br/>sample-app2-sample-app-xxx]
+            SVC[Service<br/>sample-app2-sample-app]
         end
     end
     
@@ -42,20 +42,20 @@ graph TB
 ```mermaid
 graph LR
     subgraph "GitHub - paraskanwarit"
-        subgraph "📦 sample-app-helm-chart"
+        subgraph "sample-app-helm-chart"
             CHART_DIR[charts/sample-app/]
             CHART_YAML[Chart.yaml<br/>version: 0.1.2]
             VALUES_YAML[values.yaml<br/>image: nginx:latest<br/>replicas: 2]
             TEMPLATES[templates/<br/>deployment.yaml<br/>service.yaml]
         end
         
-        subgraph "⚙️ flux-app-delivery"
+        subgraph "flux-app-delivery"
             NAMESPACE_YAML[sample-app-namespace.yaml]
             SOURCE_YAML[sample-app-source.yaml<br/>↳ Points to helm chart repo]
             HELMRELEASE_YAML[sample-app-helmrelease.yaml<br/>↳ References source & chart]
         end
         
-        subgraph "🏗️ fluxcd-gitops"
+        subgraph "fluxcd-gitops"
             SETUP_SCRIPT[scripts/complete-setup.sh]
             TERRAFORM[gke-gitops-infra/]
             DOCS[README.md<br/>demo-diagrams/]
@@ -77,11 +77,11 @@ graph LR
 
 ```mermaid
 sequenceDiagram
-    participant Dev as 👨‍💻 Developer
-    participant HelmRepo as 📦 sample-app-helm-chart
-    participant FluxRepo as ⚙️ flux-app-delivery
-    participant FluxCD as 🤖 FluxCD Controllers
-    participant K8s as ☸️ Kubernetes Cluster
+    participant Dev as Developer
+    participant HelmRepo as sample-app-helm-chart
+    participant FluxRepo as flux-app-delivery
+    participant FluxCD as FluxCD Controllers
+    participant K8s as Kubernetes Cluster
     
     Note over Dev,K8s: Scenario: Update NGINX image version
     
@@ -108,7 +108,7 @@ sequenceDiagram
 
 ```
 GitHub Repositories Structure:
-├── 📦 sample-app-helm-chart/
+├── sample-app-helm-chart/
 │   ├── charts/sample-app/
 │   │   ├── Chart.yaml ────────────┐
 │   │   ├── values.yaml           │
@@ -117,13 +117,13 @@ GitHub Repositories Structure:
 │   │       └── service.yaml      │
 │   └── README.md                 │
 │                                 │
-├── ⚙️ flux-app-delivery/          │
+├── flux-app-delivery/          │
 │   ├── sample-app-namespace.yaml │
 │   ├── sample-app-source.yaml ───┼─── references chart repo
 │   ├── sample-app-helmrelease.yaml ──┘
 │   └── README.md
 │
-└── 🏗️ fluxcd-gitops/
+└── fluxcd-gitops/
     ├── scripts/
     │   ├── complete-setup.sh ─────── creates GitRepo & Kustomization
     │   └── complete-destroy.sh
@@ -176,24 +176,24 @@ graph TD
 
 ## Key Concepts for Team Explanation
 
-### 🔄 GitOps Principles
+### GitOps Principles
 1. **Declarative**: Everything defined in Git as YAML
 2. **Versioned**: All changes tracked in Git history
 3. **Immutable**: Infrastructure as code, no manual changes
 4. **Pulled**: FluxCD pulls changes, not pushed
 
-### 🎯 Repository Separation Strategy
+### Repository Separation Strategy
 - **sample-app-helm-chart**: Contains the application package (Helm chart)
 - **flux-app-delivery**: Contains deployment configuration (where/how to deploy)
 - **fluxcd-gitops**: Contains infrastructure setup and documentation
 
-### ⚡ Automatic Deployment Flow
+### Automatic Deployment Flow
 1. Developer pushes code → GitHub
 2. FluxCD detects changes (every 1 minute)
 3. FluxCD applies changes → Kubernetes
 4. Application automatically updates
 
-### 🛡️ Benefits
+### Benefits
 - **No kubectl needed**: Everything through Git
 - **Audit trail**: All changes in Git history
 - **Rollback capability**: Git revert = application rollback

@@ -1,6 +1,6 @@
 # Repository Architecture & Team Showcase
 
-## 🏗️ Three-Repository GitOps Architecture
+## Three-Repository GitOps Architecture
 
 This document explains how our three repositories work together to create a complete GitOps workflow.
 
@@ -8,15 +8,15 @@ This document explains how our three repositories work together to create a comp
 
 ```mermaid
 graph TB
-    subgraph "🏗️ Infrastructure & Setup"
+    subgraph "Infrastructure & Setup"
         INFRA[fluxcd-gitops<br/>• Setup scripts<br/>• Terraform configs<br/>• Documentation<br/>• Demo materials]
     end
     
-    subgraph "📦 Application Package"
+    subgraph "Application Package"
         HELM[sample-app-helm-chart<br/>• Helm chart<br/>• Application templates<br/>• Default values<br/>• Chart metadata]
     end
     
-    subgraph "⚙️ Deployment Configuration"
+    subgraph "Deployment Configuration"
         FLUX[flux-app-delivery<br/>• FluxCD resources<br/>• Environment configs<br/>• Deployment policies<br/>• GitOps manifests]
     end
     
@@ -28,22 +28,22 @@ graph TB
     style FLUX fill:#f1f8e9
 ```
 
-## 📁 Detailed File Structure
+## Detailed File Structure
 
 ### 1. fluxcd-gitops (Infrastructure Repository)
 ```
 fluxcd-gitops/
-├── 📜 README.md                    # Main documentation
-├── 📊 CLEANUP_SUMMARY.md           # Cleanup report
-├── 🎯 demo-diagrams/               # Team presentation materials
+├── README.md                    # Main documentation
+├── CLEANUP_SUMMARY.md           # Cleanup report
+├── demo-diagrams/               # Team presentation materials
 │   ├── gitops-workflow.md          # Workflow diagrams
 │   └── repository-architecture.md  # This file
-├── 🔧 scripts/                     # Automation scripts
+├── scripts/                     # Automation scripts
 │   ├── complete-setup.sh           # End-to-end setup
 │   ├── complete-destroy.sh         # Cleanup script
 │   ├── test-prerequisites.sh       # Environment validation
 │   └── test-setup-dry-run.sh       # Dry-run testing
-└── 🏗️ gke-gitops-infra/           # Infrastructure as Code
+└── gke-gitops-infra/           # Infrastructure as Code
     ├── flux-bootstrap/             # FluxCD installation
     │   ├── main.tf                 # Terraform main config
     │   ├── variables.tf            # Input variables
@@ -57,8 +57,8 @@ fluxcd-gitops/
 ### 2. sample-app-helm-chart (Application Repository)
 ```
 sample-app-helm-chart/
-├── 📜 README.md                    # Chart documentation
-└── 📦 charts/sample-app/           # Helm chart package
+├── README.md                    # Chart documentation
+└── charts/sample-app/           # Helm chart package
     ├── Chart.yaml                  # Chart metadata
     │   ├── name: sample-app
     │   ├── version: 0.1.2
@@ -78,25 +78,25 @@ sample-app-helm-chart/
 flux-app-delivery/
 ├── 📜 README.md                           # Deployment docs
 ├── 🏷️ sample-app-namespace.yaml           # Namespace creation
-├── 📡 sample-app-source.yaml              # Git source definition
+├── sample-app-source.yaml              # Git source definition
 │   └── → Points to: sample-app-helm-chart
-└── 🚀 sample-app-helmrelease.yaml         # Deployment config
+└── sample-app-helmrelease.yaml         # Deployment config
     ├── → References: sample-app-source
     ├── → Chart: charts/sample-app
     └── → Values: custom overrides
 ```
 
-## 🔄 How Changes Flow Through the System
+## How Changes Flow Through the System
 
 ### Scenario: Update Application Image
 
 ```mermaid
 sequenceDiagram
-    participant Dev as 👨‍💻 Developer
-    participant Helm as 📦 sample-app-helm-chart
-    participant Flux as ⚙️ flux-app-delivery
-    participant FluxCD as 🤖 FluxCD
-    participant K8s as ☸️ GKE Cluster
+    participant Dev as Developer
+    participant Helm as sample-app-helm-chart
+    participant Flux as flux-app-delivery
+    participant FluxCD as FluxCD
+    participant K8s as GKE Cluster
     
     rect rgb(255, 248, 220)
         Note over Dev,K8s: Step 1: Update Application
@@ -121,7 +121,7 @@ sequenceDiagram
     end
 ```
 
-## 🎯 Team Demonstration Points
+## Team Demonstration Points
 
 ### 1. **Separation of Concerns**
 - **Infrastructure team**: Manages `fluxcd-gitops`
@@ -157,7 +157,7 @@ GitOps Deployment:
 Developer → git push → Automatic deployment → Guaranteed consistency
 ```
 
-## 🚀 Live Demo Script
+## Live Demo Script
 
 ### Demo 1: Show Current State
 ```bash
@@ -191,7 +191,7 @@ kubectl logs -n flux-system deployment/helm-controller -f
 kubectl describe helmrelease sample-app2 -n sample-app
 ```
 
-## 📊 Key Metrics to Highlight
+## Key Metrics to Highlight
 
 | Metric | Value | Benefit |
 |--------|-------|---------|
@@ -201,7 +201,7 @@ kubectl describe helmrelease sample-app2 -n sample-app
 | Manual Errors | 0% | Everything through Git |
 | Audit Trail | 100% | All changes in Git history |
 
-## 🎓 Team Learning Outcomes
+## Team Learning Outcomes
 
 After this demo, your team will understand:
 
@@ -211,7 +211,7 @@ After this demo, your team will understand:
 4. **Security Model**: How GitOps improves security posture
 5. **Operational Excellence**: How to achieve consistent deployments
 
-## 🔧 Troubleshooting for Demo
+## Troubleshooting for Demo
 
 ### Common Issues & Solutions
 

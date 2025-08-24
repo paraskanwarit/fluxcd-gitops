@@ -1,31 +1,31 @@
-# 🚀 GitOps Showcase with GKE and FluxCD
+# GitOps Showcase with GKE and FluxCD
 
 A complete GitOps demonstration using Google Kubernetes Engine (GKE) Autopilot and FluxCD for continuous delivery. This project showcases modern DevOps practices with Infrastructure as Code, GitOps workflows, and automated deployments.
 
-## 🎯 Project Overview
+## Project Overview
 
 This showcase demonstrates a production-ready GitOps pipeline featuring:
 
-- ☸️ **GKE Autopilot**: Serverless Kubernetes with automatic scaling and management
-- 🔄 **FluxCD v2.12.2**: GitOps continuous delivery with automatic reconciliation
-- 📦 **Helm Charts**: Kubernetes application packaging and templating
-- 🏗️ **Terraform**: Infrastructure as Code for reproducible deployments
-- 🔐 **Security-First**: No direct cluster access needed, everything through Git
-- 📊 **Multi-Repository Strategy**: Separation of concerns across three repositories
+- **GKE Autopilot**: Serverless Kubernetes with automatic scaling and management
+- **FluxCD v2.12.2**: GitOps continuous delivery with automatic reconciliation
+- **Helm Charts**: Kubernetes application packaging and templating
+- **Terraform**: Infrastructure as Code for reproducible deployments
+- **Security-First**: No direct cluster access needed, everything through Git
+- **Multi-Repository Strategy**: Separation of concerns across three repositories
 
-## 🏗️ Three-Repository GitOps Architecture
+## Three-Repository GitOps Architecture
 
 ```mermaid
 graph TB
-    subgraph "🏗️ Infrastructure & Setup"
+    subgraph "Infrastructure & Setup"
         INFRA[fluxcd-gitops<br/>• Setup automation<br/>• Terraform configs<br/>• Documentation<br/>• Demo materials]
     end
     
-    subgraph "📦 Application Package"
+    subgraph "Application Package"
         HELM[sample-app-helm-chart<br/>• Helm chart<br/>• NGINX application<br/>• Kubernetes templates<br/>• Configuration values]
     end
     
-    subgraph "⚙️ Deployment Configuration"
+    subgraph "Deployment Configuration"
         FLUX[flux-app-delivery<br/>• FluxCD resources<br/>• GitOps manifests<br/>• Deployment policies<br/>• Environment configs]
     end
     
@@ -41,11 +41,11 @@ graph TB
 
 | Repository | Purpose | Contains | Team Ownership |
 |------------|---------|----------|----------------|
-| 🏗️ **fluxcd-gitops** | Infrastructure & Setup | Scripts, Terraform, Documentation | Platform/DevOps Team |
-| 📦 **sample-app-helm-chart** | Application Package | Helm charts, Templates, Values | Development Team |
-| ⚙️ **flux-app-delivery** | Deployment Config | FluxCD manifests, Policies | Platform/SRE Team |
+| **fluxcd-gitops** | Infrastructure & Setup | Scripts, Terraform, Documentation | Platform/DevOps Team |
+| **sample-app-helm-chart** | Application Package | Helm charts, Templates, Values | Development Team |
+| **flux-app-delivery** | Deployment Config | FluxCD manifests, Policies | Platform/SRE Team |
 
-## 🔄 GitOps Workflow Visualization
+## GitOps Workflow Visualization
 
 ```mermaid
 sequenceDiagram
@@ -65,7 +65,7 @@ sequenceDiagram
     Note over Dev,K8s: ✅ Zero-touch deployment complete!
 ```
 
-## ⚡ Quick Start (5 Minutes)
+## Quick Start (5 Minutes)
 
 ### Prerequisites Checklist
 - ✅ GCP project with billing enabled
@@ -129,21 +129,21 @@ git revert HEAD && git push
 watch kubectl get pods -n sample-app
 ```
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```
 fluxcd-gitops/ (Infrastructure & Setup)
-├── 📜 README.md                        # This comprehensive guide
-├── 📊 CLEANUP_SUMMARY.md               # Repository cleanup report
-├── 🎯 demo-diagrams/                   # Team presentation materials
+├── README.md                        # This comprehensive guide
+├── CLEANUP_SUMMARY.md               # Repository cleanup report
+├── demo-diagrams/                   # Team presentation materials
 │   ├── gitops-workflow.md              # Workflow diagrams & explanations
 │   └── repository-architecture.md      # Architecture deep-dive
-├── 🔧 scripts/                         # Automation & testing
-│   ├── complete-setup.sh               # 🚀 One-command setup
-│   ├── complete-destroy.sh             # 🧹 Complete cleanup
+├── scripts/                         # Automation & testing
+│   ├── complete-setup.sh               # One-command setup
+│   ├── complete-destroy.sh             # Complete cleanup
 │   ├── test-prerequisites.sh           # Environment validation
 │   └── test-setup-dry-run.sh           # Safe testing
-└── 🏗️ gke-gitops-infra/               # Infrastructure as Code
+└── gke-gitops-infra/               # Infrastructure as Code
     ├── flux-bootstrap/                 # FluxCD installation
     │   ├── main.tf                     # Terraform FluxCD config
     │   ├── variables.tf                # Input variables
@@ -157,7 +157,7 @@ fluxcd-gitops/ (Infrastructure & Setup)
 ### Related Repositories
 
 ```
-📦 sample-app-helm-chart/               # Application Package
+sample-app-helm-chart/               # Application Package
 ├── charts/sample-app/
 │   ├── Chart.yaml                      # Chart metadata (v0.1.2)
 │   ├── values.yaml                     # Default config (nginx:latest, 2 replicas)
@@ -166,14 +166,14 @@ fluxcd-gitops/ (Infrastructure & Setup)
 │       └── service.yaml                # Service definition
 └── README.md                           # Chart documentation
 
-⚙️ flux-app-delivery/                   # GitOps Configuration
+flux-app-delivery/                   # GitOps Configuration
 ├── sample-app-namespace.yaml           # Namespace creation
 ├── sample-app-source.yaml              # Git source (→ helm chart repo)
 ├── sample-app-helmrelease.yaml         # Deployment config
 └── README.md                           # Deployment documentation
 ```
 
-## ⚙️ Configuration & Customization
+## Configuration & Customization
 
 ### Environment Configuration
 
@@ -214,7 +214,7 @@ service:
   port: 80
 ```
 
-## 🔍 Understanding the GitOps Flow
+## Understanding the GitOps Flow
 
 ### How Changes Propagate
 
@@ -247,7 +247,7 @@ kubectl get helmrelease -A
 kubectl get kustomization -A
 ```
 
-## 🚀 Usage & Operations
+## Usage & Operations
 
 ### Making Application Changes
 
@@ -328,7 +328,7 @@ kubectl describe helmrelease sample-app2 -n sample-app
 kubectl describe gitrepository flux-app-delivery -n flux-system
 ```
 
-## 🔧 Troubleshooting & FAQ
+## Troubleshooting & FAQ
 
 ### Common Issues & Solutions
 
@@ -411,22 +411,22 @@ kubectl top pods -n flux-system
 kubectl describe pod -n flux-system -l app=source-controller
 ```
 
-## 📊 Project Metrics & Achievements
+## Project Metrics & Achievements
 
 ### Deployment Statistics
-- ⚡ **Setup Time**: 5 minutes (fully automated)
-- 🔄 **Sync Interval**: 1 minute (configurable)
-- 📈 **Uptime**: 99.9% (GKE Autopilot SLA)
-- 🛡️ **Security**: Zero cluster credentials needed
-- 📝 **Audit Trail**: 100% Git-tracked changes
+- **Setup Time**: 5 minutes (fully automated)
+- **Sync Interval**: 1 minute (configurable)
+- **Uptime**: 99.9% (GKE Autopilot SLA)
+- **Security**: Zero cluster credentials needed
+- **Audit Trail**: 100% Git-tracked changes
 
 ### Repository Cleanup Results
-- 🧹 **Files Removed**: 15+ duplicate/outdated files
-- 📦 **Scripts Consolidated**: 9 → 5 essential scripts
-- 🔗 **Broken Links Fixed**: All documentation updated
-- ⚡ **Performance**: 40% faster setup time
+- **Files Removed**: 15+ duplicate/outdated files
+- **Scripts Consolidated**: 9 → 5 essential scripts
+- **Broken Links Fixed**: All documentation updated
+- **Performance**: 40% faster setup time
 
-## 🎓 Learning Resources
+## Learning Resources
 
 ### Team Training Materials
 - 📋 [GitOps Workflow Diagrams](demo-diagrams/gitops-workflow.md)
@@ -439,7 +439,7 @@ kubectl describe pod -n flux-system -l app=source-controller
 - **FluxCD Controllers**: Source, Helm, Kustomize controllers working together
 - **Security Model**: Git as single source of truth, no direct cluster access
 
-## 🤝 Contributing & Feedback
+## Contributing & Feedback
 
 ### For Team Members
 1. **Try the demo**: Run `./scripts/complete-setup.sh`
@@ -462,7 +462,7 @@ git checkout -b feature/your-improvement
 # 4. Submit PR with clear description
 ```
 
-## 🔗 Related Repositories
+## Related Repositories
 
 | Repository | Purpose | Status |
 |------------|---------|--------|
@@ -485,13 +485,13 @@ git checkout -b feature/your-improvement
 
 ---
 
-## 🎉 Success! Your GitOps Pipeline is Ready
+## Success! GitOps Pipeline is Ready
 
 This showcase demonstrates modern DevOps practices with:
-- ✅ **Zero-touch deployments** through Git
-- ✅ **Infrastructure as Code** with Terraform
-- ✅ **Automated reconciliation** via FluxCD
-- ✅ **Security-first approach** with no direct cluster access
-- ✅ **Complete audit trail** through Git history
+- **Zero-touch deployments** through Git
+- **Infrastructure as Code** with Terraform
+- **Automated reconciliation** via FluxCD
+- **Security-first approach** with no direct cluster access
+- **Complete audit trail** through Git history
 
-**Ready to demo?** Run `./scripts/complete-setup.sh` and showcase the future of application deployment! 🚀
+**Ready to demo?** Run `./scripts/complete-setup.sh` and showcase the future of application deployment!
