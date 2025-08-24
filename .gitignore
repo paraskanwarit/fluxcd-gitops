@@ -32,4 +32,5 @@ Thumbs.db
 
 # Temporary files
 *.tmp
-*.temp 
+*.temp # Prevent duplicate flux-app-delivery folder (use separate repo)
+flux-app-delivery/

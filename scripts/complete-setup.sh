@@ -417,8 +417,7 @@ setup_github_repos() {
 deploy_application() {
     print_step "Configuring GitOps deployment..."
     
-<<<<<<< HEAD
-    # Configure FluxCD to watch the flux-app-delivery repository
+    # Configure FluxCD to watch the separate flux-app-delivery repository
     print_status "Creating GitRepository for flux-app-delivery..."
     kubectl apply -f - <<EOF
 apiVersion: source.toolkit.fluxcd.io/v1
@@ -433,7 +432,7 @@ spec:
     branch: main
 EOF
 
-    # Configure FluxCD to deploy everything from the repository
+    # Configure FluxCD to deploy everything from the separate repository
     print_status "Creating Kustomization for automatic deployment..."
     kubectl apply -f - <<EOF
 apiVersion: kustomize.toolkit.fluxcd.io/v1
@@ -456,21 +455,6 @@ EOF
     # Wait for GitRepository to be ready
     print_status "Waiting for GitRepository to sync..."
     kubectl wait --for=condition=ready gitrepository/flux-app-delivery -n flux-system --timeout=300s
-=======
-    # Check if FluxCD is running
-    if ! kubectl get deployment -n flux-system &> /dev/null; then
-        print_error "FluxCD is not running. Please bootstrap FluxCD first."
-        exit 1
-    fi
-    
-    # Check if we have the flux-app-delivery directory
-    if [ ! -d "flux-app-delivery" ]; then
-        print_warning "flux-app-delivery directory not found. Please clone or create it first."
-        return 0
-    fi
-    
-    cd flux-app-delivery
->>>>>>> d50a66fd9755ba0fe8b3b9c7a10d410fd719bab0
     
     # Wait for Kustomization to be ready
     print_status "Waiting for Kustomization to deploy resources..."
