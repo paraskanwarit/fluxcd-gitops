@@ -1,211 +1,166 @@
-# GitOps Demo with FluxCD and GKE
+# GitOps Infrastructure with GKE and FluxCD
 
-A complete end-to-end GitOps demonstration using Terraform, Google Kubernetes Engine (GKE), FluxCD, and Helm.
+This repository contains a complete GitOps infrastructure setup using Google Kubernetes Engine (GKE) Autopilot and FluxCD for continuous delivery.
 
-## Architecture Overview
+## Overview
 
-This project demonstrates a production-ready GitOps pipeline with:
+This project demonstrates a production-ready GitOps pipeline that:
+- Uses existing GKE infrastructure (no cluster creation)
+- Bootstraps FluxCD for GitOps continuous delivery
+- Deploys sample applications via Helm charts
+- Integrates with GitHub Actions for CI/CD automation
 
-- **Infrastructure as Code**: GKE Autopilot cluster provisioned via Terraform
-- **GitOps Platform**: FluxCD v2.12.2 for continuous deployment
-- **Application Packaging**: Helm charts for application deployment
-- **Multi-Repository Architecture**: Separate repos for infrastructure, application, and delivery
+## Architecture
 
-## Repository Structure
+The solution follows a multi-repository GitOps pattern:
 
-```
-fluxcd-gitops/
-├── gke-gitops-infra/           # Infrastructure repository
-│   ├── environment/non-prod/dev/ # Environment-specific config
-│   └── flux-bootstrap/         # FluxCD installation
-├── sample-app-helm-chart/      # Application Helm chart repository
-│   └── charts/sample-app/      # NGINX demo application
-└── flux-app-delivery/          # FluxCD delivery repository
-    ├── namespaces/             # Kubernetes namespaces
-    └── helmrelease/            # FluxCD HelmRelease manifests
+1. **Infrastructure Repository** (this repo): Contains Terraform configurations and FluxCD manifests
+2. **Helm Chart Repository**: Contains application Helm charts
+3. **Flux Delivery Repository**: Contains FluxCD manifests for application deployment
 
-Note: GKE module is now in separate repository: https://github.com/paraskanwarit/terraform-modules
-```
+## Key Components
+
+- **GKE Autopilot**: Managed Kubernetes cluster with automatic scaling
+- **FluxCD v2**: GitOps continuous delivery tool
+- **Terraform**: Infrastructure as Code for GCP resources
+- **Helm**: Package manager for Kubernetes applications
+- **GitHub Actions**: CI/CD automation
 
 ## Quick Start
 
 ### Prerequisites
 
-- Google Cloud CLI (`gcloud`) configured
+- GCP project with billing enabled
+- GKE cluster already running
+- kubectl configured for cluster access
 - Terraform installed
-- kubectl installed
-- Git access to GitHub repositories
+- Flux CLI installed
 
-### One-Command Setup
+### Setup Steps
 
-```bash
-# Run the complete setup script
-./scripts/complete-setup.sh
+1. **Clone this repository**:
+   ```bash
+   git clone https://github.com/paraskanwarit/fluxcd-gitops.git
+   cd fluxcd-gitops
+   ```
+
+2. **Run the complete setup script**:
+   ```bash
+   ./scripts/complete-setup.sh
+   ```
+
+3. **Verify deployment**:
+   ```bash
+   kubectl get pods -A
+   kubectl get helmrelease -A
+   ```
+
+## Repository Structure
+
+```
+fluxcd-gitops/
+├── environments/
+│   └── non-prod/
+│       └── dev/
+│           ├── main.tf                 # Main Terraform config
+│           ├── backend.tf              # GCS backend configuration
+│           ├── variables.tf            # Environment variables
+│           ├── terraform.tfvars        # Variable values
+│           └── flux-bootstrap.tf.example # Optional FluxCD bootstrap
+├── flux-app-delivery/                  # FluxCD application manifests
+├── sample-app-helm-chart/             # Sample application Helm chart
+├── scripts/                           # Automation scripts
+└── docs/                             # Documentation
 ```
 
-## GitOps Promotion Process
+## Configuration
 
-### Making Changes to Your Application
+### Environment Variables
 
-When you want to make changes to your application (like updating the demo page content), follow this proper GitOps workflow:
+Update `environments/non-prod/dev/terraform.tfvars` with your values:
 
-#### Step 1: Update Your Application Code
+```hcl
+project_id = "your-gcp-project-id"
+region     = "us-central1"
+cluster_name = "your-gke-cluster-name"
+```
 
-1. **Navigate to the Helm Chart Repository**
+### FluxCD Bootstrap
+
+To enable automatic FluxCD installation:
+
+1. Copy the example file:
    ```bash
-   cd sample-app-helm-chart
+   cp environments/non-prod/dev/flux-bootstrap.tf.example \
+      environments/non-prod/dev/flux-bootstrap.tf
    ```
 
-2. **Make Your Changes**
-   - Edit files in `charts/sample-app/templates/`
-   - Update the ConfigMap content in `charts/sample-app/templates/configmap.yaml`
-   - Modify any other application files as needed
-
-3. **Update Chart Version**
+2. Apply the configuration:
    ```bash
-   # Edit charts/sample-app/Chart.yaml
-   # Change version: 0.1.1 to version: 0.1.2 (or next version)
+   cd environments/non-prod/dev
+   terraform apply
    ```
 
-#### Step 2: Update HelmRelease Version
+## Usage
 
-1. **Navigate to the Delivery Repository**
-   ```bash
-   cd ../flux-app-delivery
-   ```
+### Deploying Applications
 
-2. **Update HelmRelease Version**
-   ```bash
-   # Edit helmrelease/sample-app-helmrelease.yaml
-   # Change version: "0.1.1" to version: "0.1.2"
-   ```
+1. **Update Helm chart version** in `sample-app-helm-chart/charts/sample-app/Chart.yaml`
+2. **Update HelmRelease version** in `flux-app-delivery/helmrelease/sample-app-helmrelease.yaml`
+3. **Commit and push** changes to trigger GitOps reconciliation
 
-#### Step 3: Commit and Push Changes
+### Monitoring
 
-1. **Commit Helm Chart Changes**
-   ```bash
-   cd ../sample-app-helm-chart
-   git add .
-   git commit -m "Update demo page content - version 0.1.2"
-   git push origin main
-   ```
+- **FluxCD status**: `kubectl get helmrelease -A`
+- **Application logs**: `kubectl logs -n sample-app -l app=sample-app`
+- **FluxCD logs**: `kubectl logs -n flux-system deployment/helm-controller`
 
-2. **Commit Delivery Changes**
-   ```bash
-   cd ../flux-app-delivery
-   git add .
-   git commit -m "Update HelmRelease to version 0.1.2"
-   git push origin main
-   ```
+## Troubleshooting
 
-#### Step 4: Monitor the GitOps Pipeline
+### Common Issues
 
-1. **Check GitRepository Status**
-   ```bash
-   kubectl get gitrepository -n flux-system sample-app-helm-chart -o jsonpath='{.status.artifact.revision}'
-   ```
+1. **Port-forward fails**: Ensure no other processes are using port 8080
+2. **FluxCD reconciliation fails**: Check Helm chart versions and repository access
+3. **Terraform plan shows changes**: Verify cluster name and region match existing infrastructure
 
-2. **Monitor FluxCD Reconciliation**
-   ```bash
-   kubectl logs -n flux-system deployment/helm-controller -f
-   ```
+### Debug Commands
 
-3. **Watch Pod Updates**
-   ```bash
-   kubectl get pods -n sample-app -w
-   ```
-
-#### Step 5: Verify Deployment
-
-1. **Check Application Status**
-   ```bash
-   kubectl get helmrelease -n sample-app sample-app2 -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}'
-   ```
-
-2. **Test the Application**
-   ```bash
-   kubectl port-forward -n sample-app svc/sample-app2-sample-app 8080:80 &
-   curl http://localhost:8080
-   ```
-
-### Quick Reference Commands
-
-#### Status Check
 ```bash
-echo "=== GitOps Status ==="
-echo "GitRepository:"
-kubectl get gitrepository -n flux-system sample-app-helm-chart -o jsonpath='{.status.artifact.revision}'
-echo ""
-echo "HelmRelease:"
-kubectl get helmrelease -n sample-app sample-app2 -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}'
-echo ""
-echo "Pods:"
+# Check cluster connectivity
+kubectl cluster-info
+
+# Verify FluxCD installation
+kubectl get deployment -n flux-system
+
+# Check application status
 kubectl get pods -n sample-app
+
+# View FluxCD logs
+kubectl logs -n flux-system deployment/helm-controller
 ```
 
-#### Troubleshooting
-```bash
-# Check FluxCD logs
-kubectl logs -n flux-system deployment/helm-controller --tail=20
+## Contributing
 
-# Force reconciliation (if needed)
-kubectl patch helmrelease -n sample-app sample-app2 --type='merge' -p='{"metadata":{"annotations":{"fluxcd.io/reconcile":"true"}}}'
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
 
-# Check application logs
-kubectl logs -n sample-app deployment/sample-app2-sample-app
-```
+## License
 
-### Expected Timeline
+This project is licensed under the MIT License.
 
-- **Git Push**: Immediate
-- **FluxCD Detection**: 1-2 minutes
-- **Pod Restart**: 2-3 minutes
-- **Application Ready**: 3-5 minutes total
+## Support
 
-### Best Practices
+For issues and questions:
+- Check the troubleshooting section
+- Review FluxCD documentation
+- Open a GitHub issue
 
-1. **Always Version Your Changes**: Increment the chart version for any changes
-2. **Use Descriptive Commit Messages**: Include what changed and why
-3. **Test Locally First**: Use `helm template` to validate your changes
-4. **Monitor the Pipeline**: Watch logs and status during deployment
-5. **Rollback Strategy**: Keep previous versions for quick rollback if needed
+## References
 
-### Common Issues and Solutions
-
-#### Issue: Changes Not Reflected
-**Cause**: Chart version not updated
-**Solution**: Increment chart version and update HelmRelease
-
-#### Issue: Pod Not Updating
-**Cause**: FluxCD not detecting changes
-**Solution**: Force reconciliation or check GitRepository status
-
-#### Issue: Template Errors
-**Cause**: Invalid Helm template syntax
-**Solution**: Use `helm template` to validate before pushing
-
-## Demo Script
-
-See `DEMO_SCRIPT.md` for a complete demonstration walkthrough.
-
-## Documentation
-
-- `AUTOMATION_SUMMARY.md`: Automation features and capabilities
-- `QUICK_REFERENCE.md`: Essential commands and shortcuts
-- `GITHUB_SETUP.md`: GitHub repository setup instructions
-
-## Repository URLs
-
-- **Main Repository**: https://github.com/paraskanwarit/fluxcd-gitops
-- **Helm Chart**: https://github.com/paraskanwarit/sample-app-helm-chart
-- **FluxCD Delivery**: https://github.com/paraskanwarit/flux-app-delivery
-
-## Production Considerations
-
-- Enable RBAC and network policies
-- Configure monitoring and alerting
-- Implement backup and disaster recovery
-- Use secrets management for sensitive data
-- Set up proper CI/CD pipelines for testing
-
----
+- [FluxCD Documentation](https://fluxcd.io/docs/)
+- [GKE Autopilot](https://cloud.google.com/kubernetes-engine/docs/concepts/autopilot-overview)
+- [Terraform GCP Provider](https://registry.terraform.io/providers/hashicorp/google/latest/docs)
+- [Helm Documentation](https://helm.sh/docs/)

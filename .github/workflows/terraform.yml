@@ -1,0 +1,226 @@
+name: Terraform Apply
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'environments/non-prod/**'
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    environment:
+      name: non-prod-apply
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.8.2
+
+      - name: Google Auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: 'github-actions-sa@extreme-gecko-466211-t1.iam.gserviceaccount.com'
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy All Environments
+        run: |
+          # Get all environments to deploy
+          ENVIRONMENTS=$(find environments/non-prod -maxdepth 1 -type d -name "*" | grep -v "^environments/non-prod$" | xargs -I {} sh -c 'if [ -f "{}/main.tf" ]; then basename "{}"; fi' | sort)
+          echo "Auto-detected environments: $ENVIRONMENTS"
+          
+          # Deploy each environment
+          for ENV in $ENVIRONMENTS; do
+            echo "Deploying $ENV environment..."
+            
+            ENV_PATH="environments/non-prod/$ENV"
+            
+            # Detect infrastructure type by checking for specific files
+            if [ -f "$ENV_PATH/gke.tf" ] || [ -f "$ENV_PATH/flux-bootstrap.tf" ]; then
+              echo "Detected GitOps infrastructure (GKE + FluxCD) for $ENV"
+              
+              # GitOps infrastructure deployment (no SQL passwords needed)
+              terraform -chdir=$ENV_PATH init -lock=false
+              terraform -chdir=$ENV_PATH plan -lock=false
+              terraform -chdir=$ENV_PATH apply -auto-approve -lock=false
+              
+              echo "GitOps infrastructure for $ENV deployed successfully"
+              
+            elif [ -f "$ENV_PATH/main.tf" ] && grep -q "google_sql_database_instance" "$ENV_PATH/main.tf"; then
+              echo "Detected CloudSQL infrastructure for $ENV"
+              
+              INSTANCE_NAME="${ENV}-sql-instance"
+              
+              # Generate passwords for CloudSQL
+              ROOT_PASSWORD=$(openssl rand -base64 24 | tr -d "=+/" | cut -c1-32)
+              APP_PASSWORD=$(openssl rand -base64 24 | tr -d "=+/" | cut -c1-32)
+              
+              # CloudSQL deployment with password variables
+              terraform -chdir=$ENV_PATH init -lock=false
+              terraform -chdir=$ENV_PATH plan -lock=false -var="sql_root_password=$ROOT_PASSWORD" -var="sql_app_password=$APP_PASSWORD"
+              terraform -chdir=$ENV_PATH apply -auto-approve -lock=false -var="sql_root_password=$ROOT_PASSWORD" -var="sql_app_password=$APP_PASSWORD"
+              
+              # Store passwords for CloudSQL
+              echo "$ROOT_PASSWORD" | gcloud secrets create cloudsql-root-password-$ENV --data-file=- --replication-policy="automatic" || echo "Secret already exists"
+              echo "$APP_PASSWORD" | gcloud secrets create cloudsql-app-password-$ENV --data-file=- --replication-policy="automatic" || echo "Secret already exists"
+              
+              echo "CloudSQL infrastructure for $ENV deployed successfully"
+              
+            else
+              echo "Detected generic infrastructure for $ENV"
+              
+              # Generic infrastructure deployment (no specific variables)
+              terraform -chdir=$ENV_PATH init -lock=false
+              terraform -chdir=$ENV_PATH plan -lock=false
+              terraform -chdir=$ENV_PATH apply -auto-approve -lock=false
+              
+              echo "Generic infrastructure for $ENV deployed successfully"
+            fi
+          done
+
+  destroy:
+    runs-on: ubuntu-latest
+    environment:
+      name: non-prod-destroy
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    # Only run destroy job if we're actually deleting entire environment directories
+    if: |
+      github.event_name == 'push' &&
+      contains(github.event.head_commit.modified, 'environments/non-prod/') == false &&
+      contains(github.event.head_commit.added, 'environments/non-prod/') == false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.8.2
+
+      - name: Google Auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: 'github-actions-sa@extreme-gecko-466211-t1.iam.gserviceaccount.com'
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: List environments in previous commit
+        run: |
+          git checkout ${{ github.event.before }}
+          if [ -d "environments/non-prod" ]; then
+             find environments/non-prod -maxdepth 1 -type d -name "*" \
+               | grep -v "^environments/non-prod$" \
+               | xargs -I {} basename "{}" \
+               | sort > /tmp/prev_envs.txt
+          else
+            echo "" > /tmp/prev_envs.txt
+          fi
+
+      - name: Checkout current commit
+        run: git checkout ${{ github.sha }}
+
+      - name: List environments in current commit
+        run: |
+          if [ -d "environments/non-prod" ]; then
+             find environments/non-prod -maxdepth 1 -type d -name "*" \
+               | grep -v "^environments/non-prod$" \
+               | xargs -I {} basename "{}" \
+               | sort > curr_envs.txt
+          else
+            echo "" > curr_envs.txt
+          fi
+
+      - name: Restore prev_envs.txt from tmp
+        run: cp /tmp/prev_envs.txt prev_envs.txt
+
+      - name: Find deleted environments
+        id: find_deleted
+        run: |
+          # Only consider it a deleted environment if the entire directory is removed
+          # Not just individual files within the environment
+          DELETED_ENVS=$(git diff --name-status ${{ github.event.before }} ${{ github.sha }} \
+            | awk '/^D\s+environments\/non-prod\/[^\/]+$/ {split($2, a, "/"); print a[3]}' \
+            | sort | uniq)
+          echo "Deleted environments (entire directories): $DELETED_ENVS"
+          if [ -n "$DELETED_ENVS" ]; then
+            echo "deleted_envs=true" >> $GITHUB_OUTPUT
+            echo "$DELETED_ENVS" > deleted_envs.txt
+          else
+            echo "deleted_envs=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Destroy deleted environments
+        if: steps.find_deleted.outputs.deleted_envs == 'true'
+        run: |
+          git checkout ${{ github.event.before }}
+          while IFS= read -r ENV; do
+            echo "Destroying $ENV environment..."
+            ENV_PATH="environments/non-prod/$ENV"
+            if [ -d "$ENV_PATH" ]; then
+              # Detect infrastructure type for proper destroy
+              if [ -f "$ENV_PATH/gke.tf" ] || [ -f "$ENV_PATH/flux-bootstrap.tf" ]; then
+                echo "Destroying GitOps infrastructure for $ENV"
+                terraform -chdir=$ENV_PATH init -lock=false
+                
+                # Get cluster name from terraform state
+                CLUSTER_NAME=$(terraform -chdir=$ENV_PATH output -raw cluster_name 2>/dev/null || echo "dev-gke-autopilot")
+                REGION=$(terraform -chdir=$ENV_PATH output -raw region 2>/dev/null || echo "us-central1")
+                
+                echo "Attempting to disable deletion protection for cluster: $CLUSTER_NAME in region: $REGION"
+                
+                # Try to disable deletion protection first
+                gcloud container clusters update $CLUSTER_NAME \
+                  --region=$REGION \
+                  --no-enable-deletion-protection \
+                  --quiet || {
+                  echo "Failed to disable deletion protection. Cluster may not exist or may already have deletion protection disabled."
+                }
+                
+                # Now try to destroy
+                terraform -chdir=$ENV_PATH destroy -auto-approve -lock=false || {
+                  echo "Destroy failed. This may be due to deletion protection or other constraints."
+                  echo "Manual intervention may be required to destroy the infrastructure."
+                }
+              elif [ -f "$ENV_PATH/main.tf" ] && grep -q "google_sql_database_instance" "$ENV_PATH/main.tf"; then
+                echo "Destroying CloudSQL infrastructure for $ENV"
+                terraform -chdir=$ENV_PATH init -lock=false
+                terraform -chdir=$ENV_PATH destroy -auto-approve -lock=false -var="sql_root_password=dummy" -var="sql_app_password=dummy"
+              else
+                echo "Destroying generic infrastructure for $ENV"
+                terraform -chdir=$ENV_PATH init -lock=false
+                terraform -chdir=$ENV_PATH destroy -auto-approve -lock=false
+              fi
+            else
+              echo "$ENV_PATH does not exist in previous commit, skipping."
+            fi
+          done < deleted_envs.txt
+          git checkout ${{ github.sha }}
+
+      - name: No environments to destroy
+        if: steps.find_deleted.outputs.deleted_envs == 'false'
+        run: echo "No environments to destroy."
+        
+      - name: Handle file-only changes
+        if: steps.find_deleted.outputs.deleted_envs == 'false'
+        run: |
+          echo "Detected file changes within existing environments, not environment deletions."
+          echo "This is normal for configuration updates and does not require infrastructure destruction."
+          echo "The infrastructure will remain intact." 
