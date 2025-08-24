@@ -1,6 +1,0 @@
-# Example terraform.tfvars file for basic GKE Autopilot cluster
-# Copy this file to terraform.tfvars and update the values
-
-project_id   = "your-gcp-project-id"
-region       = "us-central1"
-cluster_name = "basic-gke-autopilot" 

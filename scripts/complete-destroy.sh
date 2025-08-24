@@ -60,7 +60,7 @@ check_prerequisites() {
     local missing_tools=()
     
     # Check required tools
-    for tool in kubectl gcloud; do
+    for tool in kubectl gcloud curl jq; do
         if ! command -v $tool &> /dev/null; then
             missing_tools+=($tool)
         fi

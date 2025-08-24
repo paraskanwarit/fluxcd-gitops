@@ -4,8 +4,7 @@ This repository contains the infrastructure-as-code setup for provisioning a Goo
 
 ## Structure
 
-- `terraform-modules/gke/`: Reusable Terraform module for GKE Autopilot clusters.
-- `environment/non-prod/dev/`: Environment-specific Terraform code to provision a dev GKE cluster using the module.
+- `environment/non-prod/dev/`: Environment-specific Terraform code to provision a dev GKE cluster using remote module.
 - `flux-bootstrap/`: Terraform code to bootstrap FluxCD onto the cluster.
 
 ## Usage

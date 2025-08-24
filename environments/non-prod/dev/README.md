@@ -34,7 +34,7 @@ The setup is modular, supports multi-repo best practices, and is designed for ea
 
 ```mermaid
 flowchart TD
-    subgraph "Infrastructure Repo (das-l4-infra-np)"
+    subgraph "Infrastructure Repo (fluxcd-gitops)"
       A1["Terraform GKE Module"]
       A2["FluxCD Bootstrap (Terraform)"]
       A3["GitHub Actions Workflow"]
@@ -69,7 +69,7 @@ flowchart TD
 
 ## Repository Structure
 
-### 1. **Infrastructure Repo** (`das-l4-infra-np`)
+### 1. **Infrastructure Repo** (`fluxcd-gitops`)
 - `environments/non-prod/dev/`
   - `gke.tf` – GKE cluster provisioning (uses remote module)
   - `variables.tf` – All variables for the environment
@@ -103,7 +103,7 @@ flowchart TD
 
 ### **1. Clone All Repos**
 ```bash
-git clone https://github.com/paraskanwarit/das-l4-infra-np.git
+git clone https://github.com/paraskanwarit/fluxcd-gitops.git
 git clone https://github.com/paraskanwarit/terraform-modules.git
 git clone https://github.com/paraskanwarit/sample-app-helm-chart.git
 git clone https://github.com/paraskanwarit/flux-app-delivery.git
@@ -226,7 +226,7 @@ terraform apply
 ```mermaid
 flowchart TD
     subgraph "GitHub"
-      GH1["das-l4-infra-np (Terraform)"]
+      GH1["fluxcd-gitops (Terraform)"]
       GH2["terraform-modules (GKE Module)"]
       GH3["sample-app-helm-chart (Helm)"]
       GH4["flux-app-delivery (FluxCD)"]

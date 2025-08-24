@@ -183,7 +183,7 @@ display_summary() {
     echo "🔗 Access Information:"
     echo "====================="
     echo "  • GKE Cluster: https://console.cloud.google.com/kubernetes/clusters/details/$REGION/$CLUSTER_NAME?project=$PROJECT_ID"
-    echo "  • GitHub Repository: https://github.com/paraskanwarit/das-l4-infra-np"
+    echo "  • GitHub Repository: https://github.com/paraskanwarit/fluxcd-gitops"
     echo
     echo "🧪 Validation Commands:"
     echo "======================"

@@ -11,8 +11,8 @@ This directory provisions a GKE Autopilot cluster in the non-prod/dev environmen
    ```
 3. Plan and apply:
    ```sh
-   terraform plan -var="project=YOUR_GCP_PROJECT_ID"
-   terraform apply -var="project=YOUR_GCP_PROJECT_ID"
+   terraform plan
+   terraform apply
    ```
 
 ## Variables
