@@ -1,4 +1,4 @@
-# 🚀 End-to-End GitOps on GKE with Terraform, FluxCD, and Helm
+#  End-to-End GitOps on GKE with Terraform, FluxCD, and Helm
 
 ## Table of Contents
 
@@ -221,7 +221,7 @@ terraform apply
 
 ---
 
-## 📈 End-to-End Flow Diagram
+##  End-to-End Flow Diagram
 
 ```mermaid
 flowchart TD
