@@ -101,7 +101,7 @@ sequenceDiagram
     K8s->>K8s: 8. Rolling update deployment
     K8s->>K8s: 9. New pods with nginx:1.25
     
-    Note over Dev,K8s: ✅ Change automatically deployed!
+    Note over Dev,K8s:  Change automatically deployed!
 ```
 
 ## 4. File Structure & Relationships

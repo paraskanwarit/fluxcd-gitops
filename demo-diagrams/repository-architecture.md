@@ -76,8 +76,8 @@ sample-app-helm-chart/
 ### 3. flux-app-delivery (GitOps Configuration Repository)
 ```
 flux-app-delivery/
-├── 📜 README.md                           # Deployment docs
-├── 🏷️ sample-app-namespace.yaml           # Namespace creation
+├──  README.md                           # Deployment docs
+├──  sample-app-namespace.yaml           # Namespace creation
 ├── sample-app-source.yaml              # Git source definition
 │   └── → Points to: sample-app-helm-chart
 └── sample-app-helmrelease.yaml         # Deployment config
@@ -117,7 +117,7 @@ sequenceDiagram
         FluxCD->>Flux: Check HelmRelease config
         FluxCD->>K8s: Apply Helm upgrade
         K8s->>K8s: Rolling update pods
-        K8s-->>Dev: ✅ Deployment complete
+        K8s-->>Dev:  Deployment complete
     end
 ```
 

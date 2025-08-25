@@ -16,7 +16,7 @@
 
 ---
 
-## 🚀 Getting Started Questions
+##  Getting Started Questions
 
 ### Q: What exactly is GitOps and how does FluxCD implement it?
 
@@ -41,7 +41,7 @@
 - **Improved security**: Fine-grained RBAC and OCI support
 - **Performance**: Better resource utilization and faster reconciliation
 
-**📖 Official Docs:**
+** Official Docs:**
 - [Migration from v1 to v2](https://fluxcd.io/flux/migration/)
 - [FluxCD v2 vs v1 Comparison](https://fluxcd.io/flux/migration/flux-v1-migration/)
 
@@ -55,7 +55,7 @@
 4. **Notification Controller**: Handles alerts and webhooks
 5. **Image Automation Controllers**: Automates image updates
 
-**📖 Official Docs:**
+** Official Docs:**
 - [FluxCD Components Overview](https://fluxcd.io/flux/components/)
 - [Controller Architecture](https://fluxcd.io/flux/concepts/#controllers)
 
@@ -92,7 +92,7 @@ terraform {
 }
 ```
 
-**📖 Official Docs:**
+** Official Docs:**
 - [Installation Guide](https://fluxcd.io/flux/installation/)
 - [Bootstrap Guide](https://fluxcd.io/flux/installation/#bootstrap)
 - [Terraform Provider](https://registry.terraform.io/providers/fluxcd/flux/latest/docs)
@@ -106,7 +106,7 @@ terraform {
 - **Network**: Outbound HTTPS access to Git repositories
 - **RBAC**: Cluster-admin permissions for installation
 
-**📖 Official Docs:**
+** Official Docs:**
 - [System Requirements](https://fluxcd.io/flux/installation/#prerequisites)
 - [Resource Requirements](https://fluxcd.io/flux/installation/#resource-requirements)
 
@@ -131,13 +131,13 @@ kubectl create secret generic https-credentials \
   --from-literal=password=$GITHUB_TOKEN
 ```
 
-**📖 Official Docs:**
+** Official Docs:**
 - [Git Authentication](https://fluxcd.io/flux/components/source/gitrepositories/#secret-reference)
 - [SSH Authentication](https://fluxcd.io/flux/guides/repository-structure/#ssh-authentication)
 
 ---
 
-## 📦 Helm & HelmRelease Questions
+##  Helm & HelmRelease Questions
 
 ### Q: How does FluxCD manage Helm charts differently from regular Helm?
 
@@ -149,7 +149,7 @@ kubectl create secret generic https-credentials \
 - **Rollback**: Automatic rollback on failed deployments
 - **Multi-source**: Can combine multiple value sources
 
-**📖 Official Docs:**
+** Official Docs:**
 - [Helm Controller Guide](https://fluxcd.io/flux/components/helm/)
 - [HelmRelease vs Helm CLI](https://fluxcd.io/flux/guides/helmreleases/)
 
@@ -177,7 +177,7 @@ spec:
   url: https://github.com/paraskanwarit/sample-app-helm-chart.git
 ```
 
-**📖 Official Docs:**
+** Official Docs:**
 - [HelmRepository API](https://fluxcd.io/flux/components/source/api/v1beta2/#source.toolkit.fluxcd.io/v1beta2.HelmRepository)
 - [GitRepository API](https://fluxcd.io/flux/components/source/api/v1/#source.toolkit.fluxcd.io/v1.GitRepository)
 
@@ -208,7 +208,7 @@ spec:
     name: my-app-secrets
 ```
 
-**📖 Official Docs:**
+** Official Docs:**
 - [HelmRelease Values](https://fluxcd.io/flux/components/helm/api/v2beta1/#helm.toolkit.fluxcd.io/v2beta1.HelmReleaseSpec)
 - [Values Sources](https://fluxcd.io/flux/guides/helmreleases/#values-sources)
 
@@ -229,13 +229,13 @@ FluxCD will:
 2. Update dependencies when chart version changes
 3. Handle dependency order during installation
 
-**📖 Official Docs:**
+** Official Docs:**
 - [Helm Dependencies](https://fluxcd.io/flux/guides/helmreleases/#helm-chart-dependencies)
 - [Chart Dependencies](https://helm.sh/docs/helm/helm_dependency/)
 
 ---
 
-## 🔄 GitOps Workflow Questions
+##  GitOps Workflow Questions
 
 ### Q: How often does FluxCD check for changes?
 
@@ -253,7 +253,7 @@ spec:
   interval: 30s  # Check every 30 seconds
 ```
 
-**📖 Official Docs:**
+** Official Docs:**
 - [Reconciliation](https://fluxcd.io/flux/concepts/#reconciliation)
 - [Interval Configuration](https://fluxcd.io/flux/components/source/api/v1/#source.toolkit.fluxcd.io/v1.GitRepositorySpec)
 
@@ -272,7 +272,7 @@ flux reconcile helmrelease my-app -n my-namespace
 flux reconcile source git --all
 ```
 
-**📖 Official Docs:**
+** Official Docs:**
 - [Flux CLI Reconcile](https://fluxcd.io/flux/cmd/flux_reconcile/)
 - [Manual Reconciliation](https://fluxcd.io/flux/guides/monitoring/#manual-reconciliation)
 
@@ -303,13 +303,13 @@ spec:
 - Separate repositories for each environment
 - Different FluxCD instances per environment
 
-**📖 Official Docs:**
+** Official Docs:**
 - [Multi-Environment Setup](https://fluxcd.io/flux/guides/repository-structure/)
 - [Environment Strategies](https://fluxcd.io/flux/guides/multi-tenancy/)
 
 ---
 
-## 🔐 Security Questions
+##  Security Questions
 
 ### Q: How does FluxCD handle secrets and sensitive data?
 
@@ -336,7 +336,7 @@ spec:
     kind: SecretStore
 ```
 
-**📖 Official Docs:**
+** Official Docs:**
 - [Secret Management](https://fluxcd.io/flux/guides/sealed-secrets/)
 - [External Secrets Integration](https://fluxcd.io/flux/guides/external-secrets/)
 
@@ -365,13 +365,13 @@ metadata:
   namespace: my-app
 ```
 
-**📖 Official Docs:**
+** Official Docs:**
 - [RBAC Configuration](https://fluxcd.io/flux/security/permissions/)
 - [Multi-tenancy Security](https://fluxcd.io/flux/guides/multi-tenancy/#security)
 
 ---
 
-## 🚨 Troubleshooting Questions
+##  Troubleshooting Questions
 
 ### Q: My GitRepository shows "not ready" - how do I debug?
 
@@ -397,7 +397,7 @@ kubectl get secret git-auth -n flux-system -o yaml
 - Network connectivity issues
 - Repository permissions
 
-**📖 Official Docs:**
+** Official Docs:**
 - [Troubleshooting Sources](https://fluxcd.io/flux/guides/monitoring/#sources)
 - [Git Authentication Troubleshooting](https://fluxcd.io/flux/components/source/gitrepositories/#troubleshooting)
 
@@ -426,7 +426,7 @@ kubectl get helmrelease my-app -n my-namespace -o yaml
 - Insufficient permissions
 - Chart template errors
 
-**📖 Official Docs:**
+** Official Docs:**
 - [HelmRelease Troubleshooting](https://fluxcd.io/flux/components/helm/troubleshooting/)
 - [Helm Controller Debugging](https://fluxcd.io/flux/guides/monitoring/#helm-releases)
 
@@ -450,13 +450,13 @@ kubectl get deployment -n flux-system
 kubectl get events -n flux-system --sort-by='.lastTimestamp'
 ```
 
-**📖 Official Docs:**
+** Official Docs:**
 - [Health Checks](https://fluxcd.io/flux/guides/monitoring/#health-checks)
 - [Flux CLI Check](https://fluxcd.io/flux/cmd/flux_check/)
 
 ---
 
-## 📊 Monitoring & Observability Questions
+##  Monitoring & Observability Questions
 
 ### Q: How do I monitor FluxCD and get alerts?
 
@@ -486,7 +486,7 @@ spec:
     name: webapp
 ```
 
-**📖 Official Docs:**
+** Official Docs:**
 - [Monitoring Guide](https://fluxcd.io/flux/guides/monitoring/)
 - [Notification Controller](https://fluxcd.io/flux/components/notification/)
 - [Prometheus Metrics](https://fluxcd.io/flux/guides/monitoring/#prometheus-metrics)
@@ -520,13 +520,13 @@ spec:
     name: msteams-webhook
 ```
 
-**📖 Official Docs:**
+** Official Docs:**
 - [Notification Providers](https://fluxcd.io/flux/components/notification/provider/)
 - [Slack Integration](https://fluxcd.io/flux/guides/notifications/#slack)
 
 ---
 
-## 🔄 Advanced Use Cases
+##  Advanced Use Cases
 
 ### Q: How do I implement progressive delivery with FluxCD?
 
@@ -564,7 +564,7 @@ spec:
       - pause: {duration: 10}
 ```
 
-**📖 Official Docs:**
+** Official Docs:**
 - [Progressive Delivery](https://fluxcd.io/flux/guides/flagger/)
 - [Flagger Integration](https://docs.flagger.app/tutorials/fluxcd-progressive-delivery)
 
@@ -590,7 +590,7 @@ spec:
 - Separate FluxCD instances per tenant
 - Cross-tenant resource isolation
 
-**📖 Official Docs:**
+** Official Docs:**
 - [Multi-tenancy Guide](https://fluxcd.io/flux/guides/multi-tenancy/)
 - [Tenant Isolation](https://fluxcd.io/flux/guides/multi-tenancy/#tenant-isolation)
 
@@ -623,13 +623,13 @@ spec:
       range: '>=1.0.0'
 ```
 
-**📖 Official Docs:**
+** Official Docs:**
 - [Image Automation](https://fluxcd.io/flux/guides/image-update/)
 - [Image Update Automation](https://fluxcd.io/flux/components/image/)
 
 ---
 
-## 🛠️ Performance & Optimization
+##  Performance & Optimization
 
 ### Q: How do I optimize FluxCD performance for large repositories?
 
@@ -666,7 +666,7 @@ spec:
   retryInterval: 2m
 ```
 
-**📖 Official Docs:**
+** Official Docs:**
 - [Performance Tuning](https://fluxcd.io/flux/guides/monitoring/#performance-tuning)
 - [Resource Management](https://fluxcd.io/flux/installation/#resource-requirements)
 
@@ -686,13 +686,13 @@ spec:
 - Kubernetes cluster performance
 - Network latency to Git repositories
 
-**📖 Official Docs:**
+** Official Docs:**
 - [Scalability Considerations](https://fluxcd.io/flux/guides/monitoring/#scalability)
 - [Resource Planning](https://fluxcd.io/flux/installation/#resource-requirements)
 
 ---
 
-## 🔗 Integration Questions
+##  Integration Questions
 
 ### Q: How does FluxCD integrate with CI/CD pipelines?
 
@@ -712,7 +712,7 @@ spec:
     git push
 ```
 
-**📖 Official Docs:**
+** Official Docs:**
 - [CI/CD Integration](https://fluxcd.io/flux/guides/image-update/#configure-image-update-for-custom-resources)
 - [GitHub Actions](https://fluxcd.io/flux/guides/mozilla-sops/#github-actions)
 
@@ -729,13 +729,13 @@ spec:
 - Use FluxCD for new applications
 - Keep ArgoCD for existing applications during transition
 
-**📖 Official Docs:**
+** Official Docs:**
 - [ArgoCD vs FluxCD](https://fluxcd.io/flux/migration/flux-v1-migration/#argo-cd-migration)
 - [GitOps Tool Comparison](https://fluxcd.io/flux/concepts/#gitops-tools-comparison)
 
 ---
 
-## 📖 Learning Resources
+##  Learning Resources
 
 ### Official FluxCD Resources
 - **Main Documentation**: [fluxcd.io/docs](https://fluxcd.io/docs/)
@@ -759,7 +759,7 @@ spec:
 
 ---
 
-## 🆘 Getting Help
+##  Getting Help
 
 ### Community Support
 - **CNCF Slack**: [#flux channel](https://cloud-native.slack.com/channels/flux)
