@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
 
 # Complete GitOps Setup Script
-# This script automates the GitOps demo setup using existing GKE infrastructure
+# This script automates the GitOps  setup using existing GKE infrastructure
 
 set -e
+
+# Do NOT create a cluster unless explicitly allowed
+ALLOW_CLUSTER_CREATE="${ALLOW_CLUSTER_CREATE:-false}"
+# Optional debugging
+DEBUG="${DEBUG:-false}"
+[[ "$DEBUG" == "true" ]] && set -x
 
 # Colors for output
 RED='\033[0;31m'
@@ -14,9 +20,9 @@ PURPLE='\033[0;35m'
 NC='\033[0m' # No Color
 
 # Configuration - Auto-detect from current context if possible
-PROJECT_ID="${PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || echo 'extreme-gecko-466211-t1')}"
-REGION="${REGION:-us-central1}"
-CLUSTER_NAME="${CLUSTER_NAME:-dev-gke-autopilot}"
+PROJECT_ID="${PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || echo 'das-terraform-dry-run')}"
+REGION="${REGION:-australia-southeast1}"
+CLUSTER_NAME="${CLUSTER_NAME:-autopilot-cluster-2}"
 GITHUB_USERNAME="${GITHUB_USERNAME:-paraskanwarit}"
 GITHUB_TOKEN="${GITHUB_TOKEN:-}"
 
@@ -105,31 +111,58 @@ enable_gcp_apis() {
     print_success "GCP APIs enabled"
 }
 
-# Function to validate existing GKE cluster
+# Function to validate existing GKE cluster  (UPDATED to be robust & opt-in for creation)
 validate_existing_cluster() {
     print_step "Validating existing GKE cluster..."
-    
-    # Check if cluster exists
-    if ! gcloud container clusters describe $CLUSTER_NAME --region=$REGION --project=$PROJECT_ID &> /dev/null; then
-        print_error "GKE cluster $CLUSTER_NAME not found in region $REGION"
-        exit 1
+
+    print_status "Checking cluster presence:"
+    print_status "  Project : $PROJECT_ID"
+    print_status "  Location: $REGION"
+    print_status "  Name    : $CLUSTER_NAME"
+
+    # Prefer --location (works for both regional and zonal clusters)
+    if gcloud container clusters describe "$CLUSTER_NAME" \
+          --location="$REGION" --project="$PROJECT_ID" &> /dev/null; then
+        print_status "Cluster $CLUSTER_NAME found in $REGION (project $PROJECT_ID)."
+    else
+        # Fallback: use list to avoid false negatives
+        if gcloud container clusters list --project="$PROJECT_ID" \
+             --format="value(name,location)" \
+             --filter="name=$CLUSTER_NAME AND location:$REGION" | grep -q .; then
+            print_status "Cluster $CLUSTER_NAME appears in cluster list for $REGION."
+        else
+            if [[ "$ALLOW_CLUSTER_CREATE" == "true" ]]; then
+                print_warning "Cluster not found. Creating with Terraform (ALLOW_CLUSTER_CREATE=true)…"
+                cd ../gke-gitops-infra/environment/non-prod/dev
+                print_status "Initializing Terraform for GKE cluster..."
+                terraform init
+                print_status "Applying Terraform to create GKE cluster..."
+                terraform apply -auto-approve \
+                    -var="project=$PROJECT_ID" \
+                    -var="region=$REGION" \
+                    -var="cluster_name=$CLUSTER_NAME"
+                cd ../../../../scripts
+                print_success "GKE cluster $CLUSTER_NAME created via Terraform."
+            else
+                print_error "Cluster $CLUSTER_NAME not found in $REGION (project $PROJECT_ID)."
+                print_error "Set ALLOW_CLUSTER_CREATE=true to let Terraform create it, or fix PROJECT_ID/REGION/CLUSTER_NAME."
+                exit 1
+            fi
+        fi
     fi
-    
-    print_status "Cluster $CLUSTER_NAME found in project $PROJECT_ID"
-    
-    # Get cluster credentials
+
     print_status "Getting cluster credentials..."
-    gcloud container clusters get-credentials $CLUSTER_NAME \
-        --region=$REGION --project=$PROJECT_ID
-    
+    gcloud container clusters get-credentials "$CLUSTER_NAME" \
+        --location="$REGION" --project="$PROJECT_ID"
+
     # Verify cluster connectivity
     if ! kubectl get nodes &> /dev/null; then
         print_error "Cannot connect to cluster. Please check your authentication."
         exit 1
     fi
-    
+
     print_success "Successfully connected to existing GKE cluster"
-    
+
     # Display cluster info
     print_status "Cluster Information:"
     kubectl cluster-info
@@ -226,7 +259,10 @@ bootstrap_fluxcd() {
     
     # Deploy FluxCD
     print_status "Deploying FluxCD..."
-    terraform apply -auto-approve
+    terraform apply -auto-approve \
+        -var="cluster_endpoint=$CLUSTER_ENDPOINT" \
+        -var="cluster_ca_certificate=$CLUSTER_CA_CERT" \
+        -var="gke_token=$GKE_TOKEN"
     
     cd ../../scripts
     
@@ -437,7 +473,7 @@ validate_deployment() {
 
 # Function to display final summary
 display_summary() {
-    print_success "GitOps Demo Setup Completed Successfully!"
+    print_success "GitOps  Setup Completed Successfully!"
     echo
     echo "Deployment Summary:"
     echo "=================="
@@ -461,13 +497,13 @@ display_summary() {
     echo "  Check app: kubectl get pods -n sample-app"
     echo "  Test app: kubectl port-forward -n sample-app svc/sample-app2-sample-app 8080:80"
     echo
-    echo "Demo Commands:"
+    echo "Commands to check:"
     echo "=============="
     echo "  Show GitOps flow: kubectl get helmrelease -A"
     echo "  Show app logs: kubectl logs -n sample-app -l app=sample-app"
     echo "  Show FluxCD logs: kubectl logs -n flux-system deployment/helm-controller"
     echo
-    echo "Your GitOps pipeline is ready for demos!"
+    echo "GitOps pipeline is ready!"
 }
 
 # Function to handle cleanup on script exit
@@ -482,7 +518,7 @@ trap cleanup EXIT
 
 # Main execution
 main() {
-    echo "Complete GitOps Demo Setup (Using Existing Infrastructure)"
+    echo "Complete GitOps  Setup (Using Existing Infrastructure)"
     echo "========================================================"
     echo
     
@@ -512,4 +548,4 @@ main() {
 }
 
 # Run main function
-main "$@" 
+main "$@"

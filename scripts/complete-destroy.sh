@@ -1,385 +1,377 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# Ensure we’re running under bash even if invoked as `sh script`
+if [ -z "${BASH_VERSION:-}" ]; then
+  if command -v bash >/dev/null 2>&1; then
+    exec bash "$0" "$@"
+  else
+    echo "This script requires bash. Run: bash $0" >&2
+    exit 1
+  fi
+fi
 
-# Complete GitOps Destroy Script
-# This script destroys the entire GitOps demo setup in proper sequence
+# Complete GitOps Destroy Script (scoped, non-destructive)
+# - Only removes objects created by the setup script
+# - Uninstalls Flux via Terraform in gke-gitops-infra/flux-bootstrap
+# - Preserves kubectl context by default (opt-in to delete)
+# - Handles GKE NEG finalizers in app namespace to avoid stuck deletions
 
-set -e
+set -Eeuo pipefail
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-PURPLE='\033[0;35m'
-NC='\033[0m' # No Color
+# ---------------------------------------
+# Colors & printing
+# ---------------------------------------
+RED=$'\033[0;31m'; GREEN=$'\033[0;32m'; YELLOW=$'\033[1;33m'; BLUE=$'\033[0;34m'; PURPLE=$'\033[0;35m'; NC=$'\033[0m'
+print_status()  { printf "%b[INFO]%b %s\n"    "$BLUE"   "$NC" "$*"; }
+print_success() { printf "%b[SUCCESS]%b %s\n" "$GREEN"  "$NC" "$*"; }
+print_warning() { printf "%b[WARNING]%b %s\n" "$YELLOW" "$NC" "$*"; }
+print_error()   { printf "%b[ERROR]%b %s\n"   "$RED"    "$NC" "$*"; }
+print_step()    { printf "%b[STEP]%b %s\n"    "$PURPLE" "$NC" "$*"; }
 
-# Configuration - Auto-detect from current context if possible
+# ---------------------------------------
+# Config (aligned with setup script)
+# ---------------------------------------
 PROJECT_ID="${PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || echo 'extreme-gecko-466211-t1')}"
 REGION="${REGION:-us-central1}"
 CLUSTER_NAME="${CLUSTER_NAME:-dev-gke-autopilot}"
 GITHUB_USERNAME="${GITHUB_USERNAME:-paraskanwarit}"
 GITHUB_TOKEN="${GITHUB_TOKEN:-}"
 
-# Try to detect cluster name from current kubectl context
-if kubectl config current-context &> /dev/null; then
-    CURRENT_CONTEXT=$(kubectl config current-context)
-    if [[ $CURRENT_CONTEXT == gke_* ]]; then
-        # Extract cluster name from GKE context format: gke_PROJECT_REGION_CLUSTER
-        DETECTED_CLUSTER=$(echo $CURRENT_CONTEXT | cut -d'_' -f4)
-        if [ ! -z "$DETECTED_CLUSTER" ]; then
-            CLUSTER_NAME="$DETECTED_CLUSTER"
-        fi
-    fi
+# Exact GitOps objects created by setup
+FLUX_NS="flux-system"
+DELIVERY_KUSTOMIZATION="${DELIVERY_KUSTOMIZATION:-flux-app-delivery}"
+DELIVERY_GITREPO="${DELIVERY_GITREPO:-flux-app-delivery}"
+APP_NAMESPACE="${APP_NAMESPACE:-sample-app}"
+APP_HELMRELEASE="${APP_HELMRELEASE:-sample-app2}"
+
+# Flux controller deployments (created by TF module)
+FLUX_DEPLOYMENTS=("source-controller" "helm-controller" "kustomize-controller")
+
+# Options
+PRESERVE_KUBECTL_CONTEXT="${PRESERVE_KUBECTL_CONTEXT:-true}"
+FORCE_DELETE_APP_NAMESPACE_FINALIZERS="${FORCE_DELETE_APP_NAMESPACE_FINALIZERS:-false}"
+
+# Resolve paths relative to this file
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+FLUX_TF_DIR="${FLUX_TF_DIR:-$REPO_ROOT/gke-gitops-infra/flux-bootstrap}"
+SCRIPTS_DIR="$REPO_ROOT/scripts"
+
+# Hard safety: don’t destroy infra/env modules
+if [[ "$FLUX_TF_DIR" == *"/environment/"* ]]; then
+  print_error "FLUX_TF_DIR points at an environment/cluster module. This script will not destroy clusters."
+  print_error "Expected Flux bootstrap module: gke-gitops-infra/flux-bootstrap"
+  exit 1
 fi
 
-# Function to print colored output
-print_status() {
-    echo -e "${BLUE}[INFO]${NC} $1"
+# ---------------------------------------
+# Helpers
+# ---------------------------------------
+ok()          { command -v "$1" >/dev/null 2>&1; }
+exists_ns()   { kubectl get ns "$1" >/dev/null 2>&1; }
+exists_res()  { kubectl get "$@" >/dev/null 2>&1; }
+
+wait_for_ns_gone() {
+  local ns="$1" timeout="${2:-180}" waited=0
+  while exists_ns "$ns"; do
+    sleep 5
+    waited=$((waited+5))
+    (( waited >= timeout )) && return 1
+  done
+  return 0
 }
 
-print_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
+ns_diag() {
+  local ns="$1"
+  print_status "Namespace $ns diagnostics:"
+  kubectl get ns "$ns" -o 'custom-columns=NAME:.metadata.name,PHASE:.status.phase,FINALIZERS:.spec.finalizers' || true
+  kubectl get events -n "$ns" --sort-by=.lastTimestamp | tail -n 10 || true
 }
 
-print_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
-
-print_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
-print_step() {
-    echo -e "${PURPLE}[STEP]${NC} $1"
-}
-
-# Function to check prerequisites
-check_prerequisites() {
-    print_step "Checking prerequisites..."
-    
-    local missing_tools=()
-    
-    # Check required tools
-    for tool in kubectl gcloud curl jq; do
-        if ! command -v $tool &> /dev/null; then
-            missing_tools+=($tool)
-        fi
+# Scoped to app namespace: clear GKE Service NEG finalizers that block deletion
+clear_gke_neg_finalizers_in_ns() {
+  local ns="$1"
+  local snegs
+  snegs="$(kubectl -n "$ns" get servicenetworkendpointgroups.networking.gke.io -o name 2>/dev/null || true)"
+  if [[ -n "$snegs" ]]; then
+    print_status "Detected SNEG resources in $ns; removing networking.gke.io/neg-finalizer"
+    local s
+    for s in $snegs; do
+      print_status "Patching $s"
+      kubectl -n "$ns" patch "$s" --type=merge -p '{"metadata":{"finalizers":[]}}' || true
     done
-    
-    if [ ${#missing_tools[@]} -ne 0 ]; then
-        print_error "Missing required tools: ${missing_tools[*]}"
-        echo "Please install the missing tools and try again."
-        exit 1
-    fi
-    
-    # Check GCP authentication
-    if ! gcloud auth list --filter=status:ACTIVE --format="value(account)" | grep -q .; then
-        print_error "GCP authentication required. Please run: gcloud auth login"
-        exit 1
-    fi
-    
-    print_success "All prerequisites are met"
+  else
+    print_status "No SNEG resources found in $ns."
+  fi
 }
 
-# Function to remove GitOps applications
+# ---------------------------------------
+# Traps
+# ---------------------------------------
+_script_failed=true
+on_err() {
+  local ec=$?
+  print_error "Command failed (exit $ec): '$BASH_COMMAND' at ${BASH_SOURCE[1]}:${BASH_LINENO[0]}"
+  _script_failed=true
+  exit $ec
+}
+on_exit() {
+  if [[ "$_script_failed" == "true" ]]; then
+    print_warning "Script exited early or failed; some resources may still exist."
+  end_if_dummy=
+  fi
+}
+trap on_err ERR
+trap on_exit EXIT
+
+# ---------------------------------------
+# Prereqs and context
+# ---------------------------------------
+check_prerequisites() {
+  print_step "Checking prerequisites..."
+  local missing=()
+  local t
+  for t in terraform kubectl gcloud curl jq; do ok "$t" || missing+=("$t"); done
+  if (( ${#missing[@]} )); then
+    print_error "Missing required tools: ${missing[*]}"
+    exit 1
+  fi
+  if ! gcloud auth list --filter=status:ACTIVE --format="value(account)" | grep -q .; then
+    print_error "GCP authentication required. Run: gcloud auth login"
+    exit 1
+  fi
+  print_success "All prerequisites are met"
+}
+
+detect_cluster_from_context() {
+  if kubectl config current-context >/dev/null 2>&1; then
+    local ctx; ctx="$(kubectl config current-context || true)"
+    if [[ "$ctx" == gke_* ]]; then
+      local detected; detected="$(cut -d'_' -f4 <<<"$ctx")"
+      [[ -n "${detected:-}" ]] && CLUSTER_NAME="$detected"
+    fi
+  fi
+}
+
+print_paths() {
+  printf "\nExecution Paths\n==================\n"
+  printf " Script dir         : %s\n" "$SCRIPT_DIR"
+  printf " Repo root          : %s\n" "$REPO_ROOT"
+  printf " Terraform (Flux)   : %s\n" "$FLUX_TF_DIR"
+  printf " Expected scripts   : %s\n\n" "$SCRIPTS_DIR"
+  [[ -d "$FLUX_TF_DIR" ]] || { print_error "Flux Terraform dir not found: $FLUX_TF_DIR"; exit 1; }
+}
+
+# ---------------------------------------
+# App removal (Flux-first, scoped)
+# ---------------------------------------
 remove_gitops_applications() {
-    print_step "Removing GitOps applications..."
-    
-    # Check if cluster is accessible
-    if ! kubectl cluster-info &> /dev/null; then
-        print_warning "Cluster not accessible. Skipping application cleanup."
-        return 0
+  print_step "Removing GitOps-managed application (scoped)"
+
+  if ! kubectl cluster-info >/dev/null 2>&1; then
+    print_warning "Cluster not accessible; skipping app cleanup."
+    return 0
+  fi
+
+  # 1) Delete the Kustomization (prunes its children only)
+  if exists_res kustomization "$DELIVERY_KUSTOMIZATION" -n "$FLUX_NS"; then
+    print_status "Deleting Kustomization $DELIVERY_KUSTOMIZATION in $FLUX_NS"
+    kubectl -n "$FLUX_NS" delete kustomization "$DELIVERY_KUSTOMIZATION" --ignore-not-found=true
+    kubectl -n "$FLUX_NS" wait --for=delete "kustomization/$DELIVERY_KUSTOMIZATION" --timeout=180s || true
+  else
+    print_status "Kustomization $DELIVERY_KUSTOMIZATION not found."
+  fi
+
+  # 2) Delete the GitRepository used by that Kustomization
+  if exists_res gitrepository "$DELIVERY_GITREPO" -n "$FLUX_NS"; then
+    print_status "Deleting GitRepository $DELIVERY_GITREPO in $FLUX_NS"
+    kubectl -n "$FLUX_NS" delete gitrepository "$DELIVERY_GITREPO" --ignore-not-found=true
+    kubectl -n "$FLUX_NS" wait --for=delete "gitrepository/$DELIVERY_GITREPO" --timeout=120s || true
+  else
+    print_status "GitRepository $DELIVERY_GITREPO not found."
+  fi
+
+  # 3) If HelmRelease still exists (e.g., Kustomization absent), remove just that one
+  if kubectl api-resources --api-group=helm.toolkit.fluxcd.io >/dev/null 2>&1; then
+    if exists_res helmrelease "$APP_HELMRELEASE" -n "$APP_NAMESPACE"; then
+      print_status "Deleting HelmRelease $APP_HELMRELEASE in $APP_NAMESPACE"
+      kubectl -n "$APP_NAMESPACE" delete helmrelease "$APP_HELMRELEASE" --ignore-not-found=true
+      kubectl -n "$APP_NAMESPACE" wait --for=delete "helmrelease/$APP_HELMRELEASE" --timeout=180s || true
     fi
-    
-    # Remove sample application
-    if kubectl get namespace sample-app &> /dev/null; then
-        print_status "Removing sample application..."
-        kubectl delete namespace sample-app --ignore-not-found=true
-        
-        # Wait for namespace to be deleted
-        print_status "Waiting for sample-app namespace to be deleted..."
-        while kubectl get namespace sample-app &> /dev/null; do
-            sleep 5
-        done
-        print_success "Sample application removed"
+  fi
+
+  # 4) Remove the app namespace only if it still exists (no wildcards)
+  if exists_ns "$APP_NAMESPACE"; then
+    print_status "Deleting application namespace $APP_NAMESPACE"
+    kubectl delete ns "$APP_NAMESPACE" --ignore-not-found=true
+
+    if wait_for_ns_gone "$APP_NAMESPACE" 240; then
+      print_success "Application namespace removed."
     else
-        print_status "Sample application not found, skipping..."
+      print_warning "Namespace $APP_NAMESPACE still terminating; checking for GKE SNEGs with neg-finalizer..."
+      ns_diag "$APP_NAMESPACE"
+      clear_gke_neg_finalizers_in_ns "$APP_NAMESPACE"
+
+      print_status "Retrying namespace deletion for $APP_NAMESPACE"
+      kubectl delete ns "$APP_NAMESPACE" --ignore-not-found=true || true
+      if wait_for_ns_gone "$APP_NAMESPACE" 180; then
+        print_success "Application namespace removed after clearing SNEG finalizers."
+      else
+        if [[ "$FORCE_DELETE_APP_NAMESPACE_FINALIZERS" == "true" ]]; then
+          print_warning "FORCE_DELETE_APP_NAMESPACE_FINALIZERS=true -> removing namespace finalizers (last resort)"
+          kubectl get ns "$APP_NAMESPACE" -o json \
+            | jq 'del(.spec.finalizers)' \
+            | kubectl replace --raw "/api/v1/namespaces/$APP_NAMESPACE/finalize" -f - || true
+          if wait_for_ns_gone "$APP_NAMESPACE" 120; then
+            print_success "Application namespace forcibly removed."
+          else
+            print_warning "Namespace $APP_NAMESPACE still terminating after force; manual investigation required."
+          fi
+        else
+          print_warning "Namespace $APP_NAMESPACE still terminating; investigate remaining finalizers:"
+          print_status "kubectl get ns $APP_NAMESPACE -o json | jq '.spec.finalizers'"
+        fi
+      fi
     fi
-    
-    # Remove GitOps configurations
-    if kubectl get namespace flux-system &> /dev/null; then
-        print_status "Removing GitOps configurations..."
-        
-        # Remove Kustomizations
-        kubectl delete kustomization --all -n flux-system --ignore-not-found=true
-        
-        # Remove GitRepositories
-        kubectl delete gitrepository --all -n flux-system --ignore-not-found=true
-        
-        # Remove HelmReleases
-        kubectl delete helmrelease --all -A --ignore-not-found=true
-        
-        print_success "GitOps configurations removed"
-    fi
+  else
+    print_status "Application namespace $APP_NAMESPACE not found."
+  fi
 }
 
-# Function to destroy FluxCD using existing Terraform code
+# ---------------------------------------
+# Terraform destroy of Flux (scoped)
+# ---------------------------------------
 destroy_fluxcd() {
-    print_step "Destroying FluxCD..."
-    
-    # Check if FluxCD is installed
-    if ! kubectl get namespace flux-system &> /dev/null; then
-        print_status "FluxCD not found, skipping..."
-        return 0
-    fi
-    
-    # Check if terraform is available
-    if ! command -v terraform &> /dev/null; then
-        print_warning "terraform not found. Manually removing FluxCD namespace..."
-        kubectl delete namespace flux-system --ignore-not-found=true
-        
-        # Wait for namespace to be deleted
-        print_status "Waiting for flux-system namespace to be deleted..."
-        while kubectl get namespace flux-system &> /dev/null; do
-            sleep 5
-        done
-        print_success "FluxCD namespace removed manually"
-        return 0
-    fi
-    
-    # Use existing Terraform code to destroy FluxCD
-    print_status "Using existing Terraform code to destroy FluxCD..."
-    
-    # Get cluster details if cluster is accessible
-    if kubectl cluster-info &> /dev/null; then
-        export CLUSTER_ENDPOINT=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
-        export CLUSTER_CA_CERT=$(kubectl config view --minify --raw -o jsonpath='{.clusters[0].cluster.certificate-authority-data}')
-        export GKE_TOKEN=$(gcloud auth print-access-token)
-        
-        cd ../gke-gitops-infra/flux-bootstrap
-        
-        # Initialize Terraform
-        print_status "Initializing FluxCD Terraform..."
-        terraform init
-        
-        # Destroy FluxCD
-        print_status "Destroying FluxCD..."
-        terraform destroy -auto-approve \
-            -var="cluster_endpoint=$CLUSTER_ENDPOINT" \
-            -var="cluster_ca_certificate=$CLUSTER_CA_CERT" \
-            -var="gke_token=$GKE_TOKEN" || {
-            print_warning "Terraform destroy failed, manually cleaning up..."
-            kubectl delete namespace flux-system --ignore-not-found=true
-        }
-        
-        cd ../../scripts
+  print_step "Destroying FluxCD via Terraform (same module as setup)"
+
+  # Gather cluster details like in setup
+  export CLUSTER_ENDPOINT="$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}' 2>/dev/null || true)"
+  export CLUSTER_CA_CERT="$(kubectl config view --minify --raw -o jsonpath='{.clusters[0].cluster.certificate-authority-data}' 2>/dev/null || true)"
+  export GKE_TOKEN="$(gcloud auth print-access-token 2>/dev/null || true)"
+
+  pushd "$FLUX_TF_DIR" >/dev/null
+  print_status "Terraform dir: $(pwd)"
+  terraform init -input=false
+  terraform destroy -auto-approve \
+    -var="cluster_endpoint=$CLUSTER_ENDPOINT" \
+    -var="cluster_ca_certificate=$CLUSTER_CA_CERT" \
+    -var="gke_token=$GKE_TOKEN" || print_warning "Terraform destroy returned non-zero; minimal manual checks will follow."
+  popd >/dev/null
+
+  # Minimal manual check: if Flux namespace still exists, delete only known controller deployments
+  if exists_ns "$FLUX_NS"; then
+    print_status "Flux namespace still present; removing only known controller deployments"
+    local d
+    for d in "${FLUX_DEPLOYMENTS[@]}"; do
+      if exists_res deploy "$d" -n "$FLUX_NS"; then
+        kubectl -n "$FLUX_NS" delete deploy "$d" --ignore-not-found=true
+        kubectl -n "$FLUX_NS" wait --for=delete "deploy/$d" --timeout=120s || true
+      fi
+    done
+
+    # If namespace is empty, delete it; otherwise leave it
+    local remains
+    remains="$(kubectl -n "$FLUX_NS" get all,secret,role,rolebinding 2>/dev/null | sed -n '2p' || true)"
+    if [[ -z "$remains" ]]; then
+      print_status "Flux namespace appears empty; deleting namespace $FLUX_NS"
+      kubectl delete ns "$FLUX_NS" --ignore-not-found=true || true
+      wait_for_ns_gone "$FLUX_NS" 180 || print_warning "Namespace $FLUX_NS still terminating; clear finalizers manually only if safe."
     else
-        print_warning "Cluster not accessible. Cannot use Terraform to destroy FluxCD."
+      print_warning "Leaving namespace $FLUX_NS intact because non-target resources remain."
     fi
-    
-    print_success "FluxCD destroyed"
+  fi
+
+  print_success "FluxCD uninstall step completed."
 }
 
-# Function to destroy GKE infrastructure using existing Terraform code
-destroy_infrastructure() {
-    print_step "GKE cluster destruction (optional)..."
-    
-    # Check if cluster exists
-    if ! gcloud container clusters describe $CLUSTER_NAME --region=$REGION --project=$PROJECT_ID &> /dev/null; then
-        print_status "Cluster $CLUSTER_NAME not found, skipping infrastructure destruction..."
-        return 0
-    fi
-    
-    echo
-    echo "⚠️  Do you want to DELETE the GKE cluster: $CLUSTER_NAME? (y/N)"
-    echo "   This will permanently destroy the entire Kubernetes cluster!"
-    read -r response
-    
-    if [[ ! "$response" =~ ^[Yy]$ ]]; then
-        print_status "Skipping GKE cluster destruction. Cluster will remain running."
-        echo "💡 To manually delete later, run:"
-        echo "   gcloud container clusters delete $CLUSTER_NAME --region=$REGION --project=$PROJECT_ID"
-        return 0
-    fi
-    
-    # Check if terraform is available
-    if ! command -v terraform &> /dev/null; then
-        print_warning "terraform not found. Please manually delete the cluster:"
-        echo "  gcloud container clusters delete $CLUSTER_NAME --region=$REGION --project=$PROJECT_ID"
-        return 0
-    fi
-    
-    # Use existing Terraform code to destroy infrastructure
-    print_status "Using existing Terraform code to destroy GKE infrastructure..."
-    
-    cd ../gke-gitops-infra/environment/non-prod/dev
-    
-    # Initialize Terraform
-    print_status "Initializing Terraform..."
-    terraform init
-    
-    # Destroy infrastructure
-    print_status "Destroying infrastructure..."
-    terraform destroy -auto-approve \
-        -var="project=$PROJECT_ID" \
-        -var="region=$REGION" \
-        -var="cluster_name=$CLUSTER_NAME" || {
-        print_warning "Terraform destroy failed. You may need to manually delete resources."
-        print_status "Manual cleanup command:"
-        echo "  gcloud container clusters delete $CLUSTER_NAME --region=$REGION --project=$PROJECT_ID"
-    }
-    
-    cd ../../../../scripts
-    
-    print_success "GKE infrastructure destruction completed"
-}
-
-# Function to clean up GitHub repositories (optional)
+# ---------------------------------------
+# GitHub cleanup (optional)
+# ---------------------------------------
 cleanup_github_repos() {
-    print_step "GitHub repository cleanup (optional)..."
-    
-    echo "Do you want to delete the GitHub repositories? (y/N)"
-    read -r response
-    
-    if [[ "$response" =~ ^[Yy]$ ]]; then
-        # Get GitHub token if not provided
-        if [ -z "$GITHUB_TOKEN" ]; then
-            print_warning "GitHub token not provided"
-            echo -n "Please enter your GitHub Personal Access Token: "
-            read -s GITHUB_TOKEN
-            echo
-        fi
-        
-        # Validate token
-        if ! curl -s -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/user | jq -e '.login' > /dev/null; then
-            print_error "Invalid GitHub token. Skipping repository cleanup."
-            return 0
-        fi
-        
-        # Delete repositories
-        local repos=("sample-app-helm-chart" "flux-app-delivery")
-        
-        for repo in "${repos[@]}"; do
-            print_status "Deleting repository: $repo"
-            
-            response=$(curl -s -X DELETE \
-                -H "Authorization: token $GITHUB_TOKEN" \
-                -H "Accept: application/vnd.github.v3+json" \
-                "https://api.github.com/repos/$GITHUB_USERNAME/$repo")
-            
-            if [ $? -eq 0 ]; then
-                print_success "Repository $repo deleted"
-            else
-                print_warning "Failed to delete repository $repo. You may need to delete it manually."
-            fi
-        done
-    else
-        print_status "Skipping GitHub repository cleanup"
-        echo "Repositories remain at:"
-        echo "  - https://github.com/$GITHUB_USERNAME/sample-app-helm-chart"
-        echo "  - https://github.com/$GITHUB_USERNAME/flux-app-delivery"
+  print_step "GitHub repository cleanup (optional)"
+  read -r -p "Delete the GitHub repositories created for this demo? (y/N) " ans
+  if [[ "$ans" =~ ^[Yy]$ ]]; then
+    if [[ -z "${GITHUB_TOKEN:-}" ]]; then
+      print_warning "GitHub token not provided"
+      read -r -s -p "Enter your GitHub Personal Access Token: " GITHUB_TOKEN; printf "\n"
     fi
+    if ! curl -s -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/user | jq -e '.login' >/dev/null; then
+      print_error "Invalid GitHub token. Skipping repo cleanup."
+      return 0
+    fi
+    local repo
+    for repo in "sample-app-helm-chart" "flux-app-delivery"; do
+      print_status "Deleting repo: $repo"
+      curl -s -X DELETE \
+        -H "Authorization: token $GITHUB_TOKEN" \
+        -H "Accept: application/vnd.github.v3+json" \
+        "https://api.github.com/repos/$GITHUB_USERNAME/$repo" >/dev/null || true
+    done
+    print_success "Requested GitHub repo deletion."
+  else
+    print_status "Skipping GitHub repository cleanup"
+    printf "Repos remain:\n  - https://github.com/%s/sample-app-helm-chart\n  - https://github.com/%s/flux-app-delivery\n" "$GITHUB_USERNAME" "$GITHUB_USERNAME"
+  fi
 }
 
-# Function to clean up local kubectl context
+# ---------------------------------------
+# Kubectl context cleanup (opt-in)
+# ---------------------------------------
 cleanup_kubectl_context() {
-    print_step "Cleaning up kubectl context..."
-    
-    local context_name="gke_${PROJECT_ID}_${REGION}_${CLUSTER_NAME}"
-    
-    if kubectl config get-contexts -o name | grep -q "^${context_name}$"; then
-        print_status "Removing kubectl context: $context_name"
-        kubectl config delete-context "$context_name" || print_warning "Failed to delete context"
-        kubectl config delete-cluster "$context_name" || print_warning "Failed to delete cluster config"
-        kubectl config delete-user "$context_name" || print_warning "Failed to delete user config"
-        print_success "kubectl context cleaned up"
-    else
-        print_status "kubectl context not found, skipping..."
-    fi
+  print_step "Cleaning up kubectl context"
+  if [[ "${PRESERVE_KUBECTL_CONTEXT}" == "true" ]]; then
+    print_status "PRESERVE_KUBECTL_CONTEXT=true -> Skipping kubectl context cleanup."
+    return 0
+  fi
+  local ctx="gke_${PROJECT_ID}_${REGION}_${CLUSTER_NAME}"
+  if kubectl config get-contexts -o name | grep -qx "$ctx"; then
+    print_status "Removing kubectl context/cluster/user: $ctx"
+    kubectl config delete-context "$ctx" || print_warning "Failed to delete context"
+    kubectl config delete-cluster "$ctx" || print_warning "Failed to delete cluster config"
+    kubectl config delete-user "$ctx" || print_warning "Failed to delete user config"
+    print_success "kubectl context cleaned up"
+  else
+    print_status "kubectl context $ctx not found; skipping"
+  fi
 }
 
-# Function to display destruction summary
+# ---------------------------------------
+# Summary
+# ---------------------------------------
 display_summary() {
-    print_success "🧹 GitOps Demo Destruction Completed!"
-    echo
-    echo "📊 Cleanup Summary:"
-    echo "=================="
-    echo "  ✅ Applications removed"
-    echo "  ✅ FluxCD destroyed"
-    if gcloud container clusters describe $CLUSTER_NAME --region=$REGION --project=$PROJECT_ID &> /dev/null; then
-        echo "  ⏭️  GKE cluster preserved (still running)"
-    else
-        echo "  ✅ GKE infrastructure destroyed"
-    fi
-    echo "  ✅ kubectl context cleaned up"
-    echo
-    echo "🔗 Remaining Resources (if any):"
-    echo "==============================="
-    echo "  • GitHub Repositories (if not deleted):"
-    echo "    - https://github.com/$GITHUB_USERNAME/sample-app-helm-chart"
-    echo "    - https://github.com/$GITHUB_USERNAME/flux-app-delivery"
-    echo
-    echo "💡 Manual Verification:"
-    echo "======================"
-    echo "  • Check GCP Console: https://console.cloud.google.com/kubernetes/list?project=$PROJECT_ID"
-    echo "  • Verify no unexpected charges in billing"
-    echo
-    echo "🎯 All GitOps demo resources have been cleaned up!"
+  print_success "GitOps Demo Destruction Completed!"
+  printf "\nCleanup Summary:\n"
+  printf "  Removed: Kustomization/%s, GitRepository/%s\n" "$DELIVERY_KUSTOMIZATION" "$DELIVERY_GITREPO"
+  printf "  Removed: HelmRelease/%s, Namespace/%s (if present)\n" "$APP_HELMRELEASE" "$APP_NAMESPACE"
+  printf "  Removed: Flux via Terraform module (dir: %s); no CRDs touched\n" "$FLUX_TF_DIR"
+  printf "\nRemaining (if you skipped repo deletion):\n"
+  printf "  • https://github.com/%s/sample-app-helm-chart\n" "$GITHUB_USERNAME"
+  printf "  • https://github.com/%s/flux-app-delivery\n" "$GITHUB_USERNAME"
+  printf "\nVerify in GCP Console:\n  • https://console.cloud.google.com/kubernetes/list?project=%s\n" "$PROJECT_ID"
 }
 
-# Function to handle cleanup on script exit
-cleanup() {
-    print_warning "Script interrupted. Some resources may still exist."
-}
-
-# Set trap for cleanup
-trap cleanup EXIT
-
-# Main execution
+# ---------------------------------------
+# Main
+# ---------------------------------------
 main() {
-    echo "🧹 Complete GitOps Demo Destruction"
-    echo "==================================="
-    echo
-    echo "⚠️  WARNING: This will clean up GitOps demo resources!"
-    echo "   ✅ Sample applications (will be removed)"
-    echo "   ✅ FluxCD installation (will be removed)"
-    echo "   ❓ GKE cluster: $CLUSTER_NAME (you'll be asked separately)"
-    echo "   ❓ GitHub repositories (optional, you'll be asked)"
-    echo "   📍 Project: $PROJECT_ID"
-    echo "   📍 Region: $REGION"
-    echo
-    echo "Continue with cleanup? (y/N)"
-    read -r response
-    
-    if [[ ! "$response" =~ ^[Yy]$ ]]; then
-        echo "Destruction cancelled."
-        exit 0
-    fi
-    
-    echo
-    print_status "Starting destruction sequence..."
-    
-    # Check prerequisites
-    check_prerequisites
-    
-    # Remove applications first (graceful shutdown)
-    remove_gitops_applications
-    
-    # Destroy FluxCD
-    destroy_fluxcd
-    
-    # Destroy infrastructure
-    destroy_infrastructure
-    
-    # Clean up GitHub repositories (optional)
-    cleanup_github_repos
-    
-    # Clean up kubectl context
-    cleanup_kubectl_context
-    
-    # Display summary
-    display_summary
+  printf "\nComplete GitOps Demo Destruction (scoped)\n===========================================\n"
+  print_paths
+  printf "\n"
+  read -r -p "Proceed with cleanup in project $PROJECT_ID, region $REGION? (y/N) " ans
+  [[ "$ans" =~ ^[Yy]$ ]] || { printf "Destruction cancelled.\n"; exit 0; }
+
+  detect_cluster_from_context
+  print_status "Using cluster: $CLUSTER_NAME (project: $PROJECT_ID, region: $REGION)"
+
+  check_prerequisites
+  remove_gitops_applications
+  destroy_fluxcd
+  cleanup_github_repos
+  cleanup_kubectl_context
+
+  # Success: disable ERR trap to prevent spurious final messages
+  _script_failed=false
+  trap - ERR
+  display_summary
 }
 
-# Run main function
 main "$@"
